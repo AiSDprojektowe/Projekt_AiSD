@@ -22,7 +22,7 @@ class Program
         Console.WriteLine($"Pierwszy prowadzący to: {data.Instructors[0].Name}, uczy: {data.Instructors[0].Subjects[0]}");
 
         Console.ReadLine();
-        Console.WriteLine("kurwa");
+        
     }
 }
 
