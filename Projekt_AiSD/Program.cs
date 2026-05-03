@@ -26,7 +26,7 @@ class Program
     }
 }
 
-// Główny kontener na wszystko
+
 public class UniversityData
 {
     [JsonPropertyName("instructors")]
