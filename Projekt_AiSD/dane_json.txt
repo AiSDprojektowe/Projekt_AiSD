@@ -1,0 +1,35 @@
+{
+  "instructors": [
+    {
+      "id": "101",
+      "name": "dr Kowalski",
+      "subjects": ["MAT1", "AiSD"],
+      "availability": {
+        "Mon": [8, 9, 10, 11],
+        "Tue": [8, 9, 10, 11, 12]
+      },
+      "preferences_text": "Preferuję zajęcia rano. Nie prowadzę w piątek.",
+      "max_hours_per_week": 16
+    }
+  ],
+  "rooms": [
+    {
+      "id": "A101",
+      "type": "lecture_hall",
+      "capacity": 120,
+      "availability": {
+        "Mon": [8, 9, 10, 11, 12, 13, 14, 15, 16]
+      }
+    }
+  ],
+  "courses": [
+    {
+      "id": "AiSD",
+      "name": "Algorytmy i Struktury Danych",
+      "type": "lab",
+      "students": 25,
+      "hours_per_week": 2,
+      "required_room_type": "computer_lab"
+    }
+  ]
+}
