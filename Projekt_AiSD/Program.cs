@@ -12,7 +12,7 @@ class Program
     {
         Console.WriteLine("Rozpoczynam wczytywanie danych...");
 
-        string filePath = "C:\\Users\\Marek\\Desktop\\AiSD_ntk\\Projekt_AiSD\\Projekt_AiSD\\data.json";
+        string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data.json");
         string jsonText = File.ReadAllText(filePath);
 
         UniversityData data = JsonSerializer.Deserialize<UniversityData>(jsonText) ?? new UniversityData();
@@ -31,6 +31,85 @@ class Program
 
 
 
+/*[ DANE WEJŚCIOWE ]
+                                 |
+                                 v
+                     +-----------------------+
+                     | Plik: data.json       |
+                     | (Prowadzący, Sale,    |
+                     |  Przedmioty)          |
+                     +-----------------------+
+                                 |
+                                 v
+======================================================================
+  MODUŁ 1: PARSER I WALIDATOR (Odpowiedzialność: Inżynier Danych)
+======================================================================
+                                 |
+        +-------------------------------------------------+
+        | 1. Wczytanie JSON (Deserializacja)              |
+        | 2. Walidacja typów i zakresów wartości          |
+        | 3. Utworzenie wewnętrznych obiektów C#          |
+        +-------------------------------------------------+
+                                 |
+                                 v
+======================================================================
+  MODUŁ 3: ANALIZA LLM (Odpowiedzialność: Inżynier Danych/LLM)
+======================================================================
+                                 |
+        +-------------------------------------------------+
+        | 1. Pobranie tekstu "preferences_text"           |
+        | 2. Wysłanie promptu do modelu Bielik 11b        | (możliwe że porcjami)
+        | 3. Odebranie ustrukturyzowanych danych JSON     |
+        | 4. Przypisanie "twardych" preferencji do klas   |
+        +-------------------------------------------------+
+                                 |
+           (Dane są teraz kompletne i sformalizowane)
+                                 v
+======================================================================
+  MODUŁ 2: SILNIK OPTYMALIZACJI (Odpowiedzialność: Inż. Algorytmów)
+======================================================================
+                                 |
+        +-------------------------------------------------+
+        | ETAP A: Algorytm Konstruktywny (Baza)           |
+        | -> Szuka planu bez błędów. Bezwzględnie spełnia |
+        |    Ograniczenia Twarde (HC-1 do HC-8):          |
+        |    * Brak kolizji sal i prowadzących            |
+        |    * Zgodność pojemności i typu sal             |
+        +-------------------------------------------------+
+                                 |
+        +-------------------------------------------------+
+        | ETAP B: Algorytm Poprawiający (Heurystyka)      |
+        | -> Modyfikuje ułożony plan by podbić wynik.     |
+        | -> Maksymalizuje zaspokojenie Ograniczeń        |
+        |    Miękkich (SC-1 do SC-6):                     |
+        |    * Preferencje z LLM, minimalizacja "okienek" |
+        | -> Zapisuje logi wartości funkcji celu          |
+        +-------------------------------------------------+
+                                 |
+                          (Gotowy Plan)
+                                 v
+======================================================================
+  MODUŁ 4: WIZUALIZACJA (Odpowiedzialność: Inżynier Wizualizacji)
+======================================================================
+                                 |
+        +-------------------------------------------------+
+        | Generowanie statycznych plików (np. HTML/PNG):  |
+        | 1. Siatka planu zajęć (Dni x Godziny)           |
+        | 2. Wykres zbieżności funkcji celu               |
+        | 3. Raport statystyczny (mapa ciepła sal)        |
+        +-------------------------------------------------+
+                                 |
+                                 v
+                       [ WYNIKI KOŃCOWE ]
+                                 |
+    +----------------------------+----------------------------+
+    |                            |                            |
+    v                            v                            v
+[ wynik.json ]             [ plan.html ]              [ wykres.png ]
 
+ - > podstawy algorytmów
+ - > podstawy GUI
+ - > walidacja danych
+ - > praca z LLM
 
-
+*/
