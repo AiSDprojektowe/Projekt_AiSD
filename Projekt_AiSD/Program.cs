@@ -12,7 +12,7 @@ class Program
     {
         Console.WriteLine("Rozpoczynam wczytywanie danych...");
 
-        string filePath = "C:\\Users\\Marek\\Desktop\\AiSD_ntk\\Projekt_AiSD\\Projekt_AiSD\\data.json";
+        string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data.json");
         string jsonText = File.ReadAllText(filePath);
 
         UniversityData data = JsonSerializer.Deserialize<UniversityData>(jsonText) ?? new UniversityData();
