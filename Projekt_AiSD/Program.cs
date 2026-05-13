@@ -110,4 +110,6 @@ class Program
  - > podstawy algorytmów
  - > podstawy GUI
  - > walidacja danych
+ - > praca z LLM
+
 */
