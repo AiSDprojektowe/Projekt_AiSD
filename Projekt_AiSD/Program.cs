@@ -6,18 +6,13 @@ using System.Collections.Generic;
 using Projekt_AiSD.Models;
 using Projekt_AiSD.Modules;
 
-
 class Program
 {
     static void Main(string[] args)
     {
         Console.WriteLine("Rozpoczynam wczytywanie danych...");
 
-<<<<<<< Updated upstream
         string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data.json");
-=======
-        string filePath = "data.json";
->>>>>>> Stashed changes
         string jsonText = File.ReadAllText(filePath);
 
         UniversityData data = JsonSerializer.Deserialize<UniversityData>(jsonText) ?? new UniversityData();
