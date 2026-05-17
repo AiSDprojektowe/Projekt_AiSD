@@ -107,8 +107,4 @@ class Program
     v                            v                            v
 [ wynik.json ]             [ plan.html ]              [ wykres.png ]
 
-Na następny tydzień : 
-trzeba przetestować bielika @Julia Szczecina  ,  zrobić działające okno gdzie da się wrzucić plik tak żeby wylądował w tym samym folderze co projekt i żeby dało się z niego korzystać @Karolina Wołoszyn , zrobić parser danych i go przetestować z walidatorem z tymi danymi co przesyłałem i co są na Teams , zacząć myśleć nad algorytmami  : najpierw spełnianie ograniczeń twardych potem miękkich  -> @Marysia Głuch @Weronika Suwała , 
-
-możecie jak chcecie na razie robić to lokalnie u siebie jak wam pasuje, ja spróbuję jak najszybciej ogarnąć tego gita
 */
