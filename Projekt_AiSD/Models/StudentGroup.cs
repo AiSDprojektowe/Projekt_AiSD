@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
 
-
 namespace Projekt_AiSD.Models
 {
-    public class Room
+    public class StudentGroup
     {
         [JsonPropertyName("id")]
         public string Id { get; set; }
@@ -14,12 +13,10 @@ namespace Projekt_AiSD.Models
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
-        [JsonPropertyName("type")]
-        public string Type { get; set; }
+        [JsonPropertyName("year")]
+        public int Year { get; set; }
 
-        [JsonPropertyName("capacity")]
-        public int Capacity { get; set; }
-
-                                                // ZNIKNĘŁO: availability. Sale są domyślnie dostępne zawsze!
+        [JsonPropertyName("students")]
+        public int Students { get; set; }
     }
 }
