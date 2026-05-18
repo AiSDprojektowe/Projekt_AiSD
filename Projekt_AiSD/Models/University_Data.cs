@@ -8,7 +8,7 @@ namespace Projekt_AiSD.Models
 {
     public class UniversityData
     {
-        // Ignorujemy metadata, chyba że chcecie je gdzieś wyświetlać
+        
         [JsonPropertyName("instructors")]
         public List<Instructor> Instructors { get; set; }
 
@@ -16,7 +16,7 @@ namespace Projekt_AiSD.Models
         public List<Room> Rooms { get; set; }
 
         [JsonPropertyName("student_groups")]
-        public List<StudentGroup> StudentGroups { get; set; } // NOWOŚĆ!
+        public List<StudentGroup> StudentGroups { get; set; } 
 
         [JsonPropertyName("courses")]
         public List<Course> Courses { get; set; }

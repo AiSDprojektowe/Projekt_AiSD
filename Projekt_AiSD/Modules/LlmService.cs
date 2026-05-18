@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Net.Http.Headers;
 using Projekt_AiSD.Models;
-
+                                                    //149.156.194.192   API bielika
 namespace Projekt_AiSD.Modules
 {
     internal class LlmService
@@ -115,4 +115,3 @@ namespace Projekt_AiSD.Modules
 
     }
 }
-//149.156.194.192   API bielika
