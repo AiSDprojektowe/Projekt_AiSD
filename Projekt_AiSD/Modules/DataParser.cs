@@ -6,5 +6,6 @@ namespace Projekt_AiSD.Modules
 {
     internal class DataParser
     {
+
     }
 }

@@ -12,7 +12,7 @@ namespace Projekt_AiSD.Models
         public string Id { get; set; }
 
         [JsonPropertyName("subject_id")]
-        public string SubjectId { get; set; } // ZMIANA
+        public string SubjectId { get; set; } 
 
         [JsonPropertyName("name")]
         public string Name { get; set; }
@@ -21,13 +21,13 @@ namespace Projekt_AiSD.Models
         public string Type { get; set; }
 
         [JsonPropertyName("group_id")]
-        public string GroupId { get; set; } // NOWOŚĆ!
+        public string GroupId { get; set; } 
 
         [JsonPropertyName("students")]
         public int Students { get; set; }
 
         [JsonPropertyName("hours_per_semester")]
-        public int HoursPerSemester { get; set; } // ZMIANA
+        public int HoursPerSemester { get; set; } 
 
         [JsonPropertyName("required_room_type")]
         public string RequiredRoomType { get; set; }

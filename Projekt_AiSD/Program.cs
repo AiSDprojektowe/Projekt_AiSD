@@ -29,7 +29,6 @@ class Program
     }
 }
 
-//linijka testowa
 
 /*[ DANE WEJŚCIOWE ]
                                  |
