@@ -138,103 +138,343 @@ namespace Projekt_AiSD.Modules
 
         //ograniczenia miekkie
 
-        public List<ScheduledLesson> OptimizeSoftConstraints(List<ScheduledLesson> initialPlan, List<Instructor> instructors)
+        // ===================================================================
+        // MODUŁ OGRANICZEŃ MIĘKKICH – ULTRA SZYBKI (ZERO-ALLOCATION)
+        // ===================================================================
+
+        // Pomocnicza klasa cache'ująca strukturę prowadzących bez ciągłej refleksji
+        private class InstructorPref
         {
-            // Robimy bezpieczną kopię planu początkowego, żeby go nie nadpisać
-            var bestPlan = new List<ScheduledLesson>(initialPlan);
-            int bestScore = CalculatePenalty(bestPlan, instructors);
+            public HashSet<string> PreferredDays { get; set; } = new HashSet<string>();
+            public int PreferredHoursStart { get; set; } = 8;
+            public int PreferredHoursEnd { get; set; } = 20;
+            public int MinStartHour { get; set; } = 8;
+            public int MaxHoursPerWeek { get; set; } = 16;
+            public Dictionary<string, HashSet<int>> ForbiddenSlots { get; set; } = new Dictionary<string, HashSet<int>>();
+        }
+
+        /// <summary>
+        /// Optymalizuje ograniczenia miękkie bez naruszania ograniczeń twardych Marysi.
+        /// </summary>
+        public List<ScheduledLesson> OptimizeSoftConstraints(List<ScheduledLesson> initialPlan, List<Instructor> instructors, List<Room> rooms)
+        {
+            var bestPlan = initialPlan.Select(l => new ScheduledLesson
+            {
+                CourseId = l.CourseId,
+                InstructorId = l.InstructorId,
+                RoomId = l.RoomId,
+                Day = l.Day,
+                StartHour = l.StartHour,
+                EndHour = l.EndHour
+            }).ToList();
+
+            // 1. CACHOWANIE REFLEKSJI (Wykonujemy dokładnie RAZ przed pętlą dla maksymalnej prędkości)
+            var instructorPrefs = new Dictionary<string, InstructorPref>();
+            var firstInst = instructors.FirstOrDefault();
+
+            if (firstInst != null)
+            {
+                var type = firstInst.GetType();
+                var preferredDaysProp = type.GetProperty("PreferredDays") ?? type.GetProperty("preferred_days");
+                var preferredHoursStartProp = type.GetProperty("PreferredHoursStart") ?? type.GetProperty("preferred_hours_start");
+                var preferredHoursEndProp = type.GetProperty("PreferredHoursEnd") ?? type.GetProperty("preferred_hours_end");
+                var minStartHourProp = type.GetProperty("MinStartHour") ?? type.GetProperty("min_start_hour");
+                var maxHoursProp = type.GetProperty("MaxHoursPerWeek") ?? type.GetProperty("max_hours_per_week");
+                var forbiddenSlotsProp = type.GetProperty("ForbiddenSlots") ?? type.GetProperty("forbidden_slots");
+
+                foreach (var inst in instructors)
+                {
+                    var pref = new InstructorPref();
+                    if (preferredDaysProp != null && preferredDaysProp.GetValue(inst) is IEnumerable<string> days)
+                        pref.PreferredDays = new HashSet<string>(days);
+
+                    pref.PreferredHoursStart = (preferredHoursStartProp?.GetValue(inst) as int?) ?? 8;
+                    pref.PreferredHoursEnd = (preferredHoursEndProp?.GetValue(inst) as int?) ?? 20;
+                    pref.MinStartHour = (minStartHourProp?.GetValue(inst) as int?) ?? 8;
+                    pref.MaxHoursPerWeek = (maxHoursProp?.GetValue(inst) as int?) ?? 16;
+
+                    // Bezpieczne mapowanie zakazanych slotów z LLM (HC-4)
+                    if (forbiddenSlotsProp != null)
+                    {
+                        if (forbiddenSlotsProp.GetValue(inst) is Dictionary<string, List<int>> fList)
+                            pref.ForbiddenSlots = fList.ToDictionary(p => p.Key, p => new HashSet<int>(p.Value));
+                        else if (forbiddenSlotsProp.GetValue(inst) is Dictionary<string, HashSet<int>> fHash)
+                            pref.ForbiddenSlots = fHash;
+                    }
+
+                    instructorPrefs[inst.Id] = pref;
+                }
+            }
+
+            // 2. PREALOKACJA BUFORÓW (Zapobiega obciążeniu Garbage Collectora w pętli)
+            var instructorTotalHours = instructors.ToDictionary(i => i.Id, _ => 0);
+            var instructorSchedule = instructors.ToDictionary(i => i.Id, _ => {
+                var arr = new List<ScheduledLesson>[5];
+                for (int d = 0; d < 5; d++) arr[d] = new List<ScheduledLesson>();
+                return arr;
+            });
+
+            var uniqueCourseIds = bestPlan.Select(l => l.CourseId).Distinct().ToArray();
+            var courseDays = uniqueCourseIds.ToDictionary(id => id, _ => new HashSet<string>());
+            var courseLessonCount = uniqueCourseIds.ToDictionary(id => id, _ => 0);
+            var groupSchedule = uniqueCourseIds.ToDictionary(id => id, _ => {
+                var arr = new List<ScheduledLesson>[5];
+                for (int d = 0; d < 5; d++) arr[d] = new List<ScheduledLesson>();
+                return arr;
+            });
+
+            var instructorIds = instructors.Select(i => i.Id).ToArray();
+            int[] lessonsPerDay = new int[5];
+
+            // Obliczenie kary początkowej
+            int bestScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
             Random rnd = new Random();
-            int maxIterations = 3000; // Liczba prób optymalizacji
+            int maxIterations = 3000;
 
             for (int i = 0; i < maxIterations; i++)
             {
-                // Tworzymy roboczą kopię planu do przetestowania zmiany
-                var currentPlan = new List<ScheduledLesson>(bestPlan);
+                if (bestPlan.Count == 0) break;
 
-                if (currentPlan.Count == 0) break;
+                int randomLessonIndex = rnd.Next(bestPlan.Count);
+                var lesson = bestPlan[randomLessonIndex];
 
-                // Losujemy jedne zajęcia i próbujemy zmienić im dzień tygodnia
-                int randomLessonIndex = rnd.Next(currentPlan.Count);
-                var lessonToMove = currentPlan[randomLessonIndex];
-
-                string oldDay = lessonToMove.Day;
+                string oldDay = lesson.Day;
                 string newDay = Days[rnd.Next(Days.Length)];
 
                 if (oldDay == newDay) continue;
 
-                lessonToMove.Day = newDay;
+                // Weryfikacja twardych ograniczeń (w tym ochrona przed wrzuceniem w zakazane godziny LLM - HC-4)
+                if (CausesHardConstraintViolation(bestPlan, lesson, newDay, rooms, instructorPrefs))
+                {
+                    continue;
+                }
 
-                // Liczymy punkty karne dla nowego układu
-                int currentScore = CalculatePenalty(currentPlan, instructors);
+                lesson.Day = newDay;
 
-                // Jeśli nowy układ jest LEPSZY (ma mniej punktów karnych), zapisujemy go
+                int currentScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
+
                 if (currentScore < bestScore)
                 {
-                    bestPlan = currentPlan;
-                    bestScore = currentScore;
+                    bestScore = currentScore; // Zmiana na plus, akceptujemy
+                }
+                else
+                {
+                    lesson.Day = oldDay; // Zmiana gorsza, cofamy (Rollback)
                 }
             }
 
-            Console.WriteLine($"[Optymalizacja] Wynik startowy: {CalculatePenalty(initialPlan, instructors)} | Wynik końcowy: {bestScore}");
+            Console.WriteLine($"[Optymalizacja SC] Kara początkowa: {CalculatePenalty(initialPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay)} | Kara końcowa: {bestScore}");
             return bestPlan;
         }
 
         /// <summary>
-        /// Funkcja Celu (Fitting Function) - zlicza naruszenia ograniczeń miękkich zgodnie z instrukcją projektu.
+        /// Szybka weryfikacja O(N) uwzględniająca zarówno nakładanie się, jak i zakazy godzinowe LLM (HC-4).
         /// </summary>
-        private int CalculatePenalty(List<ScheduledLesson> plan, List<Instructor> instructors)
+        private bool CausesHardConstraintViolation(List<ScheduledLesson> plan, ScheduledLesson movedLesson, string targetDay, List<Room> rooms, Dictionary<string, InstructorPref> instructorPrefs)
         {
-            int penalty = 0;
-
-            // SC-6: Maksymalne obciążenie tygodniowe prowadzącego (Waga: Wysoka)
-            var instructorHours = plan.GroupBy(p => p.InstructorId)
-                                      .ToDictionary(g => g.Key, g => g.Sum(l => l.EndHour - l.StartHour));
-
-            foreach (var instructor in instructors)
+            // HC-4: Ochrona dostępności godzinowej prowadzącego przekazanej z modułu LLM
+            if (instructorPrefs.TryGetValue(movedLesson.InstructorId, out var pref) && pref.ForbiddenSlots != null)
             {
-                if (instructorHours.ContainsKey(instructor.Id) && instructorHours[instructor.Id] > instructor.MaxHoursPerWeek)
+                if (pref.ForbiddenSlots.TryGetValue(targetDay, out var forbiddenHours))
                 {
-                    penalty += 100; // Duża kara za przeciążenie pracownika [cite: 93]
-                }
-            }
-
-            // SC-2: Minimalizacja okienek dla prowadzących w ciągu dnia (Waga: Średnia)
-            var scheduleByInstructorAndDay = plan.GroupBy(p => new { p.InstructorId, p.Day });
-            foreach (var dailySchedule in scheduleByInstructorAndDay)
-            {
-                var sortedLessons = dailySchedule.OrderBy(l => l.StartHour).ToList();
-                for (int i = 0; i < sortedLessons.Count - 1; i++)
-                {
-                    int gap = sortedLessons[i + 1].StartHour - sortedLessons[i].EndHour;
-                    if (gap > 0)
+                    for (int hour = movedLesson.StartHour; hour < movedLesson.EndHour; hour++)
                     {
-                        penalty += gap * 20; // Punkty karne za każdą godzinę "okienka" [cite: 87]
+                        if (forbiddenHours.Contains(hour)) return true; // Trafiono w zabroniony slot z LLM!
                     }
                 }
             }
 
-            // SC-3: Grupowanie zajęć - wykład i lab z tego samego przedmiotu w RÓŻNE dni (Waga: Średnia)
-            var courseGroups = plan.GroupBy(p => p.CourseId);
-            foreach (var group in courseGroups)
+            // HC-5: Ochrona dostępności sal
+            var targetRoom = rooms.FirstOrDefault(r => r.Id == movedLesson.RoomId);
+            if (targetRoom != null)
             {
-                var daysUsed = group.Select(l => l.Day).Distinct().Count();
-                if (group.Count() > 1 && daysUsed == 1)
+                for (int hour = movedLesson.StartHour; hour < movedLesson.EndHour; hour++)
                 {
-                    penalty += 30; // Kara za upchnięcie wszystkiego z jednego przedmiotu w jeden dzień [cite: 89]
+                    if (!targetRoom.Availability.ContainsKey(targetDay) || !targetRoom.Availability[targetDay].Contains(hour))
+                    {
+                        return true;
+                    }
                 }
             }
 
-            // SC-4: Równomierne rozłożenie zajęć na cały tydzień (Waga: Niska)
-            var lessonsPerDay = plan.GroupBy(p => p.Day).Select(g => g.Count()).ToList();
-            if (lessonsPerDay.Count > 0)
+            // HC-1, HC-2, HC-3: Ochrona przed nakładaniem się zajęć
+            foreach (var other in plan)
             {
-                int maxLessons = lessonsPerDay.Max();
-                int minLessons = lessonsPerDay.Min();
-                penalty += (maxLessons - minLessons) * 5; // Mała kara za dysproporcję między dniami [cite: 90]
+                if (other == movedLesson) continue;
+                if (other.Day != targetDay) continue;
+
+                bool hoursOverlap = movedLesson.StartHour < other.EndHour && movedLesson.EndHour > other.StartHour;
+                if (hoursOverlap)
+                {
+                    if (other.InstructorId == movedLesson.InstructorId) return true;
+                    if (other.RoomId == movedLesson.RoomId) return true;
+                    if (other.CourseId == movedLesson.CourseId) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Funkcja celu czyszcząca i ponownie wykorzystująca gotowe struktury (Zero-Allocation).
+        /// </summary>
+        private int CalculatePenalty(
+            List<ScheduledLesson> plan,
+            Dictionary<string, InstructorPref> instructorPrefs,
+            string[] instructorIds,
+            string[] courseIds,
+            Dictionary<string, int> instructorTotalHours,
+            Dictionary<string, List<ScheduledLesson>[]> instructorSchedule,
+            Dictionary<string, HashSet<string>> courseDays,
+            Dictionary<string, int> courseLessonCount,
+            Dictionary<string, List<ScheduledLesson>[]> groupSchedule,
+            int[] lessonsPerDay)
+        {
+            int penalty = 0;
+
+            // Szybkie czyszczenie prealokowanych kontenerów (Zamiast "new" w pętli)
+            for (int i = 0; i < instructorIds.Length; i++)
+            {
+                instructorTotalHours[instructorIds[i]] = 0;
+                var schedule = instructorSchedule[instructorIds[i]];
+                for (int d = 0; d < 5; d++) schedule[d].Clear();
+            }
+            for (int i = 0; i < courseIds.Length; i++)
+            {
+                courseDays[courseIds[i]].Clear();
+                courseLessonCount[courseIds[i]] = 0;
+                var gSched = groupSchedule[courseIds[i]];
+                for (int d = 0; d < 5; d++) gSched[d].Clear();
+            }
+            Array.Clear(lessonsPerDay, 0, 5);
+
+            // Jeden liniowy przebieg agregujący dane z aktualnego stanu planu
+            foreach (var l in plan)
+            {
+                int dayIdx = GetDayIndex(l.Day);
+                if (dayIdx == -1) continue;
+
+                lessonsPerDay[dayIdx]++;
+                instructorTotalHours[l.InstructorId] += (l.EndHour - l.StartHour);
+                instructorSchedule[l.InstructorId][dayIdx].Add(l);
+
+                courseDays[l.CourseId].Add(l.Day);
+                courseLessonCount[l.CourseId]++;
+                groupSchedule[l.CourseId][dayIdx].Add(l);
+
+                // SC-1: Preferencje prowadzących (WAGA: 100)
+                if (instructorPrefs.TryGetValue(l.InstructorId, out var pref))
+                {
+                    if (pref.PreferredDays.Count > 0 && !pref.PreferredDays.Contains(l.Day))
+                    {
+                        penalty += 100;
+                    }
+                    if (l.StartHour < pref.PreferredHoursStart || l.EndHour > pref.PreferredHoursEnd)
+                    {
+                        penalty += 100;
+                    }
+                    if (l.StartHour < pref.MinStartHour)
+                    {
+                        penalty += 100;
+                    }
+                }
+            }
+
+            // SC-6: Maksymalne obciążenie tygodniowe prowadzącego (WAGA: 100 za każdą nadgodzinę)
+            for (int i = 0; i < instructorIds.Length; i++)
+            {
+                string instId = instructorIds[i];
+                int hours = instructorTotalHours[instId];
+                if (instructorPrefs.TryGetValue(instId, out var pref) && hours > pref.MaxHoursPerWeek)
+                {
+                    penalty += (hours - pref.MaxHoursPerWeek) * 100;
+                }
+            }
+
+            // SC-2: Minimalizacja okienek dla prowadzących (WAGA: 30 za godzinę przerwy)
+            for (int i = 0; i < instructorIds.Length; i++)
+            {
+                var daysArray = instructorSchedule[instructorIds[i]];
+                for (int d = 0; d < 5; d++)
+                {
+                    List<ScheduledLesson> dayLessons = daysArray[d];
+                    if (dayLessons.Count < 2) continue;
+
+                    dayLessons.Sort((x, y) => x.StartHour.CompareTo(y.StartHour));
+
+                    for (int j = 0; j < dayLessons.Count - 1; j++)
+                    {
+                        int gap = dayLessons[j + 1].StartHour - dayLessons[j].EndHour;
+                        if (gap > 0) penalty += gap * 30;
+                    }
+                }
+            }
+
+            // SC-3: Wykład i lab tego samego przedmiotu w różne dni (WAGA: 30)
+            for (int i = 0; i < courseIds.Length; i++)
+            {
+                string cId = courseIds[i];
+                if (courseLessonCount[cId] > 1 && courseDays[cId].Count == 1)
+                {
+                    penalty += 30;
+                }
+            }
+
+            // SC-5: Przemieszczanie się studentów - zajęcia POD RZĄD w różnych salach (WAGA: 10)
+            for (int i = 0; i < courseIds.Length; i++)
+            {
+                var daysArray = groupSchedule[courseIds[i]];
+                for (int d = 0; d < 5; d++)
+                {
+                    List<ScheduledLesson> dayLessons = daysArray[d];
+                    if (dayLessons.Count < 2) continue;
+
+                    dayLessons.Sort((x, y) => x.StartHour.CompareTo(y.StartHour));
+
+                    for (int j = 0; j < dayLessons.Count - 1; j++)
+                    {
+                        // Poprawka: sprawdzamy tylko zajęcia następujące bezpośrednio po sobie (pod rząd)
+                        if (dayLessons[j].EndHour == dayLessons[j + 1].StartHour)
+                        {
+                            if (dayLessons[j].RoomId != dayLessons[j + 1].RoomId)
+                            {
+                                penalty += 10;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // SC-4: Równomierne rozłożenie obciążenia na dni tygodnia (WAGA: 5)
+            int maxLessons = 0;
+            int minLessons = int.MaxValue;
+            for (int d = 0; d < 5; d++)
+            {
+                if (lessonsPerDay[d] > maxLessons) maxLessons = lessonsPerDay[d];
+                if (lessonsPerDay[d] < minLessons) minLessons = lessonsPerDay[d];
+            }
+            if (minLessons != int.MaxValue)
+            {
+                penalty += (maxLessons - minLessons) * 5;
             }
 
             return penalty;
+        }
+
+        /// <summary>
+        /// Mapuje skrót nazwy dnia tygodnia na indeks tablicy (0-4).
+        /// </summary>
+        private int GetDayIndex(string day)
+        {
+            switch (day)
+            {
+                case "Mon": return 0;
+                case "Tue": return 1;
+                case "Wed": return 2;
+                case "Thu": return 3;
+                case "Fri": return 4;
+                default: return -1;
+            }
         }
 
     }
