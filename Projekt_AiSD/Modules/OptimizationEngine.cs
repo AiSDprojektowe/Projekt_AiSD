@@ -138,10 +138,6 @@ namespace Projekt_AiSD.Modules
 
         //ograniczenia miekkie
 
-        // ===================================================================
-        // MODUŁ OGRANICZEŃ MIĘKKICH – ULTRA SZYBKI (ZERO-ALLOCATION)
-        // ===================================================================
-
         // Pomocnicza klasa cache'ująca strukturę prowadzących bez ciągłej refleksji
         private class InstructorPref
         {
