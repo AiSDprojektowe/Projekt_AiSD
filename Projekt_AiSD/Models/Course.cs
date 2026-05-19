@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
 
+
 namespace Projekt_AiSD.Models
 {
     public class Course
@@ -10,17 +11,23 @@ namespace Projekt_AiSD.Models
         [JsonPropertyName("id")]
         public string Id { get; set; }
 
+        [JsonPropertyName("subject_id")]
+        public string SubjectId { get; set; } 
+
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
         [JsonPropertyName("type")]
         public string Type { get; set; }
 
+        [JsonPropertyName("group_id")]
+        public string GroupId { get; set; } 
+
         [JsonPropertyName("students")]
         public int Students { get; set; }
 
-        [JsonPropertyName("hours_per_week")]
-        public int HoursPerWeek { get; set; }
+        [JsonPropertyName("hours_per_semester")]
+        public int HoursPerSemester { get; set; } 
 
         [JsonPropertyName("required_room_type")]
         public string RequiredRoomType { get; set; }
