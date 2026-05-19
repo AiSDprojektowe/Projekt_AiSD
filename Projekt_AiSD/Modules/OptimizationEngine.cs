@@ -168,38 +168,50 @@ namespace Projekt_AiSD.Modules
                 EndHour = l.EndHour
             }).ToList();
 
-            // 1. CACHOWANIE REFLEKSJI (Wykonujemy dokładnie RAZ przed pętlą dla maksymalnej prędkości)
+            // 1. CACHOWANIE REFLEKSJI (Wchodzimy do klasy Preferences i obsługujemy literówki)
             var instructorPrefs = new Dictionary<string, InstructorPref>();
             var firstInst = instructors.FirstOrDefault();
 
             if (firstInst != null)
             {
                 var type = firstInst.GetType();
-                var preferredDaysProp = type.GetProperty("PreferredDays") ?? type.GetProperty("preferred_days");
-                var preferredHoursStartProp = type.GetProperty("PreferredHoursStart") ?? type.GetProperty("preferred_hours_start");
-                var preferredHoursEndProp = type.GetProperty("PreferredHoursEnd") ?? type.GetProperty("preferred_hours_end");
-                var minStartHourProp = type.GetProperty("MinStartHour") ?? type.GetProperty("min_start_hour");
-                var maxHoursProp = type.GetProperty("MaxHoursPerWeek") ?? type.GetProperty("max_hours_per_week");
-                var forbiddenSlotsProp = type.GetProperty("ForbiddenSlots") ?? type.GetProperty("forbidden_slots");
+                var preferencesProp = type.GetProperty("Preferences") ?? type.GetProperty("preferences");
 
                 foreach (var inst in instructors)
                 {
                     var pref = new InstructorPref();
-                    if (preferredDaysProp != null && preferredDaysProp.GetValue(inst) is IEnumerable<string> days)
-                        pref.PreferredDays = new HashSet<string>(days);
+                    object prefsObj = preferencesProp?.GetValue(inst);
 
-                    pref.PreferredHoursStart = (preferredHoursStartProp?.GetValue(inst) as int?) ?? 8;
-                    pref.PreferredHoursEnd = (preferredHoursEndProp?.GetValue(inst) as int?) ?? 20;
-                    pref.MinStartHour = (minStartHourProp?.GetValue(inst) as int?) ?? 8;
-                    pref.MaxHoursPerWeek = (maxHoursProp?.GetValue(inst) as int?) ?? 16;
-
-                    // Bezpieczne mapowanie zakazanych slotów z LLM (HC-4)
-                    if (forbiddenSlotsProp != null)
+                    if (prefsObj != null)
                     {
-                        if (forbiddenSlotsProp.GetValue(inst) is Dictionary<string, List<int>> fList)
-                            pref.ForbiddenSlots = fList.ToDictionary(p => p.Key, p => new HashSet<int>(p.Value));
-                        else if (forbiddenSlotsProp.GetValue(inst) is Dictionary<string, HashSet<int>> fHash)
-                            pref.ForbiddenSlots = fHash;
+                        var prefType = prefsObj.GetType();
+
+                        // Obsługa potencjalnych literówek z "Preffered" (podwójne f)
+                        var prefDaysProp = prefType.GetProperty("PreferredDays") ?? prefType.GetProperty("PrefferedDays");
+                        var prefHoursStartProp = prefType.GetProperty("PreferredHoursStart") ?? prefType.GetProperty("PrefferedHoursStart");
+                        var prefHoursEndProp = prefType.GetProperty("PreferredHoursEnd") ?? prefType.GetProperty("PrefferedHoursEnd");
+                        var minStartHourProp = prefType.GetProperty("MinStartHour") ?? prefType.GetProperty("min_start_hour");
+                        var maxHoursProp = prefType.GetProperty("MaxHoursPerWeek") ?? prefType.GetProperty("max_hours_per_week");
+
+                        var forbiddenSlotsProp = prefType.GetProperty("ForbiddenSlots") ?? type.GetProperty("ForbiddenSlots");
+
+                        if (prefDaysProp != null && prefDaysProp.GetValue(prefsObj) is IEnumerable<string> days)
+                            pref.PreferredDays = new HashSet<string>(days);
+
+                        pref.PreferredHoursStart = (prefHoursStartProp?.GetValue(prefsObj) as int?) ?? 8;
+                        pref.PreferredHoursEnd = (prefHoursEndProp?.GetValue(prefsObj) as int?) ?? 20;
+                        pref.MinStartHour = (minStartHourProp?.GetValue(prefsObj) as int?) ?? 8;
+                        pref.MaxHoursPerWeek = (maxHoursProp?.GetValue(prefsObj) as int?) ?? 16;
+
+                        if (forbiddenSlotsProp != null)
+                        {
+                            object fSlotsSource = prefType.GetProperty("ForbiddenSlots") != null ? prefsObj : inst;
+
+                            if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, List<int>> fList)
+                                pref.ForbiddenSlots = fList.ToDictionary(p => p.Key, p => new HashSet<int>(p.Value));
+                            else if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, HashSet<int>> fHash)
+                                pref.ForbiddenSlots = fHash;
+                        }
                     }
 
                     instructorPrefs[inst.Id] = pref;
@@ -244,7 +256,7 @@ namespace Projekt_AiSD.Modules
 
                 if (oldDay == newDay) continue;
 
-                // Weryfikacja twardych ograniczeń (w tym ochrona przed wrzuceniem w zakazane godziny LLM - HC-4)
+                // Weryfikacja twardych ograniczeń
                 if (CausesHardConstraintViolation(bestPlan, lesson, newDay, rooms, instructorPrefs))
                 {
                     continue;
@@ -433,7 +445,6 @@ namespace Projekt_AiSD.Modules
 
                     for (int j = 0; j < dayLessons.Count - 1; j++)
                     {
-                        // Poprawka: sprawdzamy tylko zajęcia następujące bezpośrednio po sobie (pod rząd)
                         if (dayLessons[j].EndHour == dayLessons[j + 1].StartHour)
                         {
                             if (dayLessons[j].RoomId != dayLessons[j + 1].RoomId)
@@ -476,6 +487,5 @@ namespace Projekt_AiSD.Modules
                 default: return -1;
             }
         }
-
-    }
-}
+    } // Zamyka klasę OptimizationEngine
+} // Zamyka namespace Projekt_AiSD.Modules
