@@ -1,7 +1,13 @@
-﻿using System;
+﻿using Projekt_AiSD.Models;
+using System;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+                                                    //149.156.194.192   API bielika
+namespace Projekt_AiSD.Modules
+{
+    public class LlmService
 using System.Net.Http.Headers;
 using Projekt_AiSD.Models;
 /*
@@ -44,59 +50,23 @@ namespace Projekt_AiSD.Modules
             var systemPrompt =
                 """
                 Jesteś parserem preferencji prowadzących.
-                Zwracaj WYŁĄCZNIE poprawny JSON.
+                Zwracaj WYŁĄCZNIE poprawny JSON bez markdown formatting.
+                Dni: "monday", "tuesday", "wednesday", "thursday", "friday"
+                Godziny: liczby od 8 do 18
                 """;
             //wstawia tekst użytkownika i mówi modelowi co zrobić
             var userPrompt =
-    "Tekst preferencji prowadzącego:\n" +
-    "\"" + text + "\"\n\n" +
-
-    "Przykładowe dane systemu planowania:\n\n" +
-
-    "{\n" +
-    "  \"availability\": {\n" +
-    "    \"Mon\": [8,9,10,11],\n" +
-    "    \"Tue\": [8,9,10,11,12],\n" +
-    "    \"Wed\": [8,9,10],\n" +
-    "    \"Thu\": [10,11,12],\n" +
-    "    \"Fri\": [8,9,10]\n" +
-    "  }\n" +
-    "}\n\n" +
-
-    "Twoim zadaniem jest wyciągnięcie preferencji prowadzącego " +
-    "i zwrócenie WYŁĄCZNIE poprawnego JSON-a.\n\n" +
-
-    "Dozwolone dni:\n" +
-    "Mon, Tue, Wed, Thu, Fri\n\n" +
-
-    "Format odpowiedzi:\n\n" +
-
-    "{\n" +
-    "  \"preferred_days\": [],\n" +
-    "  \"preferred_hours_start\": null,\n" +
-    "  \"preferred_hours_end\": null,\n" +
-    "  \"forbidden_slots\": [],\n" +
-    "  \"min_start_hour\": null\n" +
-    "}\n\n" +
-
-    "Zasady:\n" +
-    "- preferred_days = lista preferowanych dni\n" +
-    "- preferred_hours_start = preferowana godzina rozpoczęcia\n" +
-    "- preferred_hours_end = preferowana godzina zakończenia\n" +
-    "- forbidden_slots = zakazane terminy\n" +
-    "- min_start_hour = najwcześniejsza akceptowalna godzina rozpoczęcia\n" +
-    "- godziny zapisuj jako liczby całkowite\n" +
-    "- jeśli brak informacji użyj null albo []\n" +
-    "- forbidden_slots musi mieć format:\n\n" +
-
-    "[\n" +
-    "  {\n" +
-    "    \"day\": \"Fri\",\n" +
-    "    \"hours\": [8,9,10,11]\n" +
-    "  }\n" +
-    "]\n\n" +
-
-    "Przykład 1:\n\n" +
+                $"Tekst:\n" +
+                $"\"{text}\"\n\n" +
+                "Zwróć JSON:\n" +
+                "{\n" +
+                " \"preferred_days\": [\"monday\"], \n" +
+                " \"preferred_hours_start\": [8], \n" +
+                " \"preferred_hours_end\": [18], \n" +
+                " \"forbidden_slots\": [], \n" +
+                " \"min_start_hour\": [8],\n" +
+                " \"max_end_hour\": [18]\n" +
+                "}";
 
     "Tekst:\n" +
     "\"Nie prowadzę w piątki\"\n\n" +

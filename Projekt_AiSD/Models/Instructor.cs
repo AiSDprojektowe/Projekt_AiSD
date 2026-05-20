@@ -26,5 +26,6 @@ namespace Projekt_AiSD.Models
 
         // Nasza kieszeń na przetłumaczone dane od Bielika (z Etapu 2)
         public Preferences ParsedPreferences { get; set; }
+        public int PrefferedHoursPerWeek { get; internal set; }
     }
 }

@@ -1,36 +1,122 @@
-﻿using System;
+﻿using Projekt_AiSD.Models;
+using Projekt_AiSD.Modules;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Collections.Generic;
-using Projekt_AiSD.Models;
-using Projekt_AiSD.Modules;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        Console.WriteLine("Rozpoczynam wczytywanie danych...");
+        Console.WriteLine("╔══════════════════════════════════════════════╗");
+        Console.WriteLine("║   Optymalizator Planu Zajęć - Projekt AiSD   ║");
+        Console.WriteLine("╚══════════════════════════════════════════════╝\n");
+
 
         string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data.json");
-        string jsonText = File.ReadAllText(filePath);
 
+        Console.WriteLine("Krok 1: Walidacja danych...\n");
+        if (!DataValidator.ValidateJson(filePath))
+        {
+            Console.WriteLine("\n❌ Walidacja nie powiodła się! Sprawdź dane w pliku data.json");
+            return;
+        }
+
+        Console.WriteLine("\nDane zostały zaakceptowane. Wczytywanie...\n");
+
+        string jsonText = File.ReadAllText(filePath);
         UniversityData data = JsonSerializer.Deserialize<UniversityData>(jsonText) ?? new UniversityData();
 
         Console.WriteLine($"Wczytano prowadzących: {data.Instructors.Count}");
         Console.WriteLine($"Wczytano sal: {data.Rooms.Count}");
         Console.WriteLine($"Wczytano przedmiotów: {data.Courses.Count}");
+        Console.WriteLine($"Wczytano grup studenckich: {data.StudentGroups.Count}");
 
-        Console.WriteLine($"Pierwszy prowadzący to: {data.Instructors[0].Name}, uczy: {data.Instructors[0].Subjects[0]}");
+        if (data.Instructors.Count > 0)
+        {
+            Console.WriteLine($"\nPierwszy prowadzący: {data.Instructors[0].Name}");
+            if (data.Instructors[0].Subjects != null && data.Instructors[0].Subjects.Count > 0)
+            {
+                Console.WriteLine($"Przedmioty: {string.Join(", ", data.Instructors[0].Subjects)}");
+            }
+        }
 
-        
-       
-        
+        // TEST LLM SERVICE
+        Console.WriteLine("\n" + new string('=', 50));
+        Console.WriteLine("Krok 2: Test połączenia z modelem Bielik...\n");
+        await TestLlmService();
+
+        Console.WriteLine("\nNaciśnij Enter, aby zakończyć...");
+        Console.ReadLine();
+    }
+
+    static async Task TestLlmService()
+    {
+        try
+        {
+            Console.WriteLine("Inicjalizacja LlmService...");
+            var llmService = new LlmService();
+
+            Console.WriteLine("Wysyłanie test prompt do modelu Bielik...\n");
+
+            string testText = "Wolę pracować w poniedziałki i wtorki. Zaczynam o 9 rano, kończę o 17.";
+
+            Console.WriteLine($"Testowy tekst: \"{testText}\"\n");
+
+            var preferences = await llmService.ParsePreferences(testText);
+
+            if (preferences != null)
+            {
+                Console.WriteLine("  Model Bielik ODPOWIADA! Poprawnie sparsował dane:\n");
+                Console.WriteLine($"   • Preferowane dni: {(preferences.PreferredDays?.Count > 0 ? string.Join(", ", preferences.PreferredDays) : "brak")}");
+                Console.WriteLine($"   • Godziny startu: {(preferences.PreferredHoursStart?.Count > 0 ? string.Join(", ", preferences.PreferredHoursStart) : "brak")}");
+                Console.WriteLine($"   • Godziny końca: {(preferences.PreferredHoursEnd?.Count > 0 ? string.Join(", ", preferences.PreferredHoursEnd) : "brak")}");
+                Console.WriteLine($"   • Zakazane sloty: {(preferences.ForbiddenSlots?.Count > 0 ? string.Join(", ", preferences.ForbiddenSlots) : "brak")}");
+                Console.WriteLine($"   • Min start: {(preferences.MinStartHour?.Count > 0 ? string.Join(", ", preferences.MinStartHour) : "brak")}");
+                Console.WriteLine($"   • Max end: {(preferences.MaxEndHour?.Count > 0 ? string.Join(", ", preferences.MaxEndHour) : "brak")}");
+            }
+            else
+            {
+                Console.WriteLine("❌ Model Bielik NIE ODPOWIADA lub zwrócił niepoprawne dane!");
+                Console.WriteLine("   Sprawdź:");
+                Console.WriteLine("   1. Czy model jest uruchomiony (http://localhost:1234)?");
+                Console.WriteLine("   2. Czy zmienną LLM_API_URL ustawiono poprawnie?");
+                Console.WriteLine("   3. Czy 'SpeakLeash/bielik-11b-v3.0-instruct:Q4_K_M' jest załadowany?");
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine("❌ BŁĄD POŁĄCZENIA:");
+            Console.WriteLine($"   {ex.Message}");
+            Console.WriteLine("\n   Upewnij się, że:");
+            Console.WriteLine("   1. Model Bielik jest uruchomiony na http://localhost:1234");
+            Console.WriteLine("   2. API odpowiada na /v1/chat/completions");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("❌ BŁĄD NIEZNANY:");
+            Console.WriteLine($"   {ex.Message}");
+            Console.WriteLine($"\n   Stack trace: {ex.StackTrace}");
+        }
     }
 }
+     
 
+/*                                             data.json(wczytanie)
+                                                        ↓
+                                                    Program.cs(deserializacja)
+                                                        ↓
+                                                    DataValidator.ValidateJson()(sprawdzenie podstawowe)
+                                                        ↓
+                                                    LlmService(analiza preferences_text)
+                                                        ↓
+                                                    OptimizationEngine(generowanie planu)
 
-/*[ DANE WEJŚCIOWE ]
+[ DANE WEJŚCIOWE ]
                                  |
                                  v
                      +-----------------------+
