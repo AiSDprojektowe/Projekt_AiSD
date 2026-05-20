@@ -7,7 +7,7 @@ using Projekt_AiSD.Models;
                                                     //149.156.194.192   API bielika
 namespace Projekt_AiSD.Modules
 {
-    internal class LlmService
+    public class LlmService
     {
         private readonly HttpClient _httpClient;
 
@@ -32,7 +32,9 @@ namespace Projekt_AiSD.Modules
             var systemPrompt =
                 """
                 Jesteś parserem preferencji prowadzących.
-                Zwracaj WYŁĄCZNIE poprawny JSON.
+                Zwracaj WYŁĄCZNIE poprawny JSON bez markdown formatting.
+                Dni: "monday", "tuesday", "wednesday", "thursday", "friday"
+                Godziny: liczby od 8 do 18
                 """;
 
             var userPrompt =
@@ -40,11 +42,12 @@ namespace Projekt_AiSD.Modules
                 $"\"{text}\"\n\n" +
                 "Zwróć JSON:\n" +
                 "{\n" +
-                " \"preferred_days\": [], \n" +
-                " \"preferred_hours_start\": null, \n" +
-                " \"preferred_hours_end\": null, \n" +
+                " \"preferred_days\": [\"monday\"], \n" +
+                " \"preferred_hours_start\": [8], \n" +
+                " \"preferred_hours_end\": [18], \n" +
                 " \"forbidden_slots\": [], \n" +
-                " \"min_start_hour\": null\n" +
+                " \"min_start_hour\": [8],\n" +
+                " \"max_end_hour\": [18]\n" +
                 "}";
 
             var body = new

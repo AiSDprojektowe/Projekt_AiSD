@@ -7,19 +7,23 @@ namespace Projekt_AiSD.Models
 {
     public class Preferences
     {
-        [JsonPropertyName("preffered_days")]
-        public List<string> PrefferedDays { get; set; }
+        [JsonPropertyName("preferred_days")]
+        public List<string> PreferredDays { get; set; } = new List<string>();
         
-        [JsonPropertyName("preffered_hours_start")]
-        public List<string> PrefferedHoursStart { get; set; }
+        [JsonPropertyName("preferred_hours_start")]
+        public List<int> PreferredHoursStart { get; set; } = new List<int>();
         
-        [JsonPropertyName("preffered_hours_end")]
-        public List<string> PrefferedHoursEnd { get; set; }
+        [JsonPropertyName("preferred_hours_end")]
+        public List<int> PreferredHoursEnd { get; set; } = new List<int>();
         
         [JsonPropertyName("forbidden_slots")]
         public List<string> ForbiddenSlots { get; set; }
         
         [JsonPropertyName("min_start_hour")]
         public List<string> MinStartHour { get; set; }
+
+        [JsonPropertyName("max_end_hour")]
+        public List<string> MaxEndHour { get; set; }
+
     }
 }

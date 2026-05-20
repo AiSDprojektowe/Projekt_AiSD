@@ -30,7 +30,7 @@ namespace Projekt_AiSD.Modules
                 // Sprawdzanie Instruktorów
                 foreach (var inst in data.Instructors)
                 {
-                    if (inst.MaxHoursPerWeek < 0)
+                    if (inst.PrefferedHoursPerWeek < 0)
                     {
                         Console.WriteLine($"[!] Błąd danych: {inst.Name} ma ujemne godziny!");
                         isOk = false;
@@ -46,6 +46,8 @@ namespace Projekt_AiSD.Modules
                         isOk = false;
                     }
                 }
+
+
 
                 return isOk;
             }
