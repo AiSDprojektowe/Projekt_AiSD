@@ -1,0 +1,95 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AvaloniaApplication1.Views.MainView">
+
+    <Grid Margin="20"
+          RowDefinitions="Auto,Auto,*"
+          ColumnDefinitions="320,*"
+          RowSpacing="15"
+          ColumnSpacing="20">
+
+        <TextBlock Grid.Row="0"
+                   Grid.ColumnSpan="2"
+                   Text="Generator planu zajęć"
+                   FontSize="30"
+                   FontWeight="Bold"/>
+
+        <Border Grid.Row="1"
+                Grid.Column="0"
+                Grid.RowSpan="2"
+                BorderBrush="Gray"
+                BorderThickness="1"
+                Padding="15">
+
+            <StackPanel Spacing="12">
+
+                <TextBlock Text="Dane wejściowe"
+                           FontSize="20"
+                           FontWeight="Bold"/>
+
+                <TextBlock Text="Ścieżka do pliku JSON:"/>
+
+                <TextBox x:Name="JsonPathBox"
+                         PlaceholderText="np. C:\data.json"/>
+
+                <Button x:Name="LoadJsonButton"
+                        Content="Wczytaj JSON"
+                        Height="35"/>
+
+                <Button x:Name="GeneratePlanButton"
+                        Content="Wygeneruj plan"
+                        Height="35"/>
+
+                <TextBlock x:Name="StatusText"
+                           Text="Status: gotowe"
+                           TextWrapping="Wrap"
+                           Foreground="Gray"/>
+
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Grid.Column="1"
+                BorderBrush="Gray"
+                BorderThickness="1"
+                Padding="15">
+
+            <StackPanel Spacing="10">
+
+                <TextBlock Text="Wygenerowany plan zajęć"
+                           FontSize="20"
+                           FontWeight="Bold"/>
+
+                <TextBox x:Name="PlanOutputBox"
+                         Height="360"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas"
+                         Text="Tutaj pojawi się plan od poniedziałku do piątku, 8:00–16:00."/>
+
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2"
+                Grid.Column="1"
+                BorderBrush="Gray"
+                BorderThickness="1"
+                Padding="15">
+
+            <StackPanel Spacing="10">
+
+                <TextBlock Text="Wykres liczby zajęć w dniach"
+                           FontSize="20"
+                           FontWeight="Bold"/>
+
+                <Canvas x:Name="ChartCanvas"
+                        Width="600"
+                        Height="180"
+                        Background="White"/>
+
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>
