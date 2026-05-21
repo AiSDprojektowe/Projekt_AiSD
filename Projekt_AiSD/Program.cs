@@ -45,7 +45,7 @@ class Program
             }
         }
 
-        // TEST LLM SERVICE
+        
         Console.WriteLine("\n" + new string('=', 50));
         Console.WriteLine("Krok 2: Test połączenia z modelem Bielik...\n");
         await TestLlmService();
