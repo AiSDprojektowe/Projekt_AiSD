@@ -63,7 +63,7 @@ class Program
 
             Console.WriteLine("Wysyłanie test prompt do modelu Bielik...\n");
 
-            string testText = "Chcę pracować w poniedziałki i czwartki. Chciałbym zaczynać pracę o 9 rano, ale najwcześniej mogę zacząć o 8 rano. Chciałbym kończyć o 15.";
+            string testText = "Chcę pracować w środy i piątki. Chciałbym zaczynać pracę o 9 rano, ale najwcześniej mogę zacząć o 8 rano. Chciałbym kończyć o 15.";
 
             Console.WriteLine($"Testowy tekst: \"{testText}\"\n");
 
