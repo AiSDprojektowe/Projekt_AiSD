@@ -116,6 +116,7 @@ class Program
                                                         ↓
                                                     OptimizationEngine(generowanie planu)
 
+
 [ DANE WEJŚCIOWE ]
                                  |
                                  v

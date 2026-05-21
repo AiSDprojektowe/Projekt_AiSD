@@ -20,6 +20,6 @@ namespace Projekt_AiSD.Models
         [JsonPropertyName("capacity")]
         public int Capacity { get; set; }
 
-                                                // ZNIKNĘŁO: availability. Sale są domyślnie dostępne zawsze!
+                                           
     }
 }

@@ -20,11 +20,9 @@ namespace Projekt_AiSD.Models
         [JsonPropertyName("subjects")]
         public List<string> Subjects { get; set; }
 
-        //Zamiast "max_hours_per_week" mamy godziny na semestr
         [JsonPropertyName("hours_per_semester")]
         public int HoursPerSemester { get; set; }
 
-        // Nasza kieszeń na przetłumaczone dane od Bielika (z Etapu 2)
         public Preferences ParsedPreferences { get; set; }
         public int PrefferedHoursPerWeek { get; internal set; }
     }

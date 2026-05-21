@@ -4,26 +4,28 @@ using System.Collections.Generic;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-                                                    //149.156.194.192   API bielika
+using System.Threading.Tasks; 
+
 namespace Projekt_AiSD.Modules
 {
     public class LlmService
     {
         private readonly HttpClient _httpClient;
 
+        
+        private const string ApiUrl = "http://149.156.194.192:8088/v1/chat/completions";
+
+        
+        private const string Token = "bsk-ee761fa7d676f98fa7f2caed36cb41bbd4b2c88bdb31e36afac829415dfb0ec2";
+
         public LlmService()
         {
             _httpClient = new HttpClient();
-            
-            var apiUrl = Environment.GetEnvironmentVariable("LLM_API_URL") ?? "http://localhost:1234/v1/";
-            
-            var token = Environment.GetEnvironmentVariable("LLM_API_TOKEN");
-            
-            _httpClient.BaseAddress = new Uri(apiUrl);
 
-            if (!string.IsNullOrWhiteSpace(token))
+           
+            if (!string.IsNullOrWhiteSpace(Token))
             {
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
             }
         }
 
@@ -68,15 +70,18 @@ namespace Projekt_AiSD.Modules
                 },
                 temperature = 0
             };
-            
+
             var json = JsonSerializer.Serialize(body);
+
+            
             var response = await _httpClient.PostAsync(
-                "chat/completions",
+                ApiUrl,
                 new StringContent(json, Encoding.UTF8, "application/json"));
+
             response.EnsureSuccessStatusCode();
-            
+
             var responseText = await response.Content.ReadAsStringAsync();
-            
+
             return ParsePreferencesResponse(responseText);
         }
 
@@ -94,27 +99,23 @@ namespace Projekt_AiSD.Modules
                 if (string.IsNullOrWhiteSpace(content))
                     return null;
 
+                
                 content = content
-                    .Replace("'''json", "")
-                    .Replace("'''", "")
+                    .Replace("```json", "")
+                    .Replace("```", "")
                     .Trim();
+
                 return JsonSerializer.Deserialize<Preferences>(content,
                     new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     });
-
-
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 return null;
             }
-            
         }
-
-
-
     }
 }
