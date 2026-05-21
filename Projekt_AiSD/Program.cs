@@ -45,7 +45,7 @@ class Program
             }
         }
 
-        // TEST LLM SERVICE
+        
         Console.WriteLine("\n" + new string('=', 50));
         Console.WriteLine("Krok 2: Test połączenia z modelem Bielik...\n");
         await TestLlmService();
@@ -63,7 +63,7 @@ class Program
 
             Console.WriteLine("Wysyłanie test prompt do modelu Bielik...\n");
 
-            string testText = "Wolę pracować w poniedziałki i wtorki. Zaczynam o 9 rano, kończę o 17.";
+            string testText = "Chcę pracować w środy i piątki. Chciałbym zaczynać pracę o 9 rano, ale najwcześniej mogę zacząć o 8 rano. Chciałbym kończyć o 15.";
 
             Console.WriteLine($"Testowy tekst: \"{testText}\"\n");
 
@@ -73,11 +73,11 @@ class Program
             {
                 Console.WriteLine("  Model Bielik ODPOWIADA! Poprawnie sparsował dane:\n");
                 Console.WriteLine($"   • Preferowane dni: {(preferences.PreferredDays?.Count > 0 ? string.Join(", ", preferences.PreferredDays) : "brak")}");
-                Console.WriteLine($"   • Godziny startu: {(preferences.PreferredHoursStart?.Count > 0 ? string.Join(", ", preferences.PreferredHoursStart) : "brak")}");
-                Console.WriteLine($"   • Godziny końca: {(preferences.PreferredHoursEnd?.Count > 0 ? string.Join(", ", preferences.PreferredHoursEnd) : "brak")}");
+                Console.WriteLine($"   • Preferowane godziny startu: {(preferences.PreferredHoursStart > 0 ? string.Join(", ", preferences.PreferredHoursStart) : "brak")}");
+                Console.WriteLine($"   • Preferowane godziny końca: {(preferences.PreferredHoursEnd > 0 ? string.Join(", ", preferences.PreferredHoursEnd) : "brak")}");
                 Console.WriteLine($"   • Zakazane sloty: {(preferences.ForbiddenSlots?.Count > 0 ? string.Join(", ", preferences.ForbiddenSlots) : "brak")}");
-                Console.WriteLine($"   • Min start: {(preferences.MinStartHour?.Count > 0 ? string.Join(", ", preferences.MinStartHour) : "brak")}");
-                Console.WriteLine($"   • Max end: {(preferences.MaxEndHour?.Count > 0 ? string.Join(", ", preferences.MaxEndHour) : "brak")}");
+                Console.WriteLine($"   • Minimalny start: {(preferences.MinStartHour > 0 ? string.Join(", ", preferences.MinStartHour) : "brak")}");
+                Console.WriteLine($"   • Maksymalne zakończenie: {(preferences.MaxEndHour > 0 ? string.Join(", ", preferences.MaxEndHour) : "brak")}");
             }
             else
             {
@@ -115,6 +115,7 @@ class Program
                                                     LlmService(analiza preferences_text)
                                                         ↓
                                                     OptimizationEngine(generowanie planu)
+
 
 [ DANE WEJŚCIOWE ]
                                  |

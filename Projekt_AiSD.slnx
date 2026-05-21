@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="Projekt_AiSD.GUI/Projekt_AiSD.GUI.csproj" Id="add322de-37e1-4ec0-8e9d-748105b81414" />
   <Project Path="Projekt_AiSD/Projekt_AiSD.csproj" />
 </Solution>
