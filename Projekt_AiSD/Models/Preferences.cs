@@ -11,19 +11,19 @@ namespace Projekt_AiSD.Models
         public List<string> PreferredDays { get; set; } = new List<string>();
 
         [JsonPropertyName("preferred_hours_start")]
-        public int PreferredHoursStart { get; set; } // Zwykły int!
+        public int PreferredHoursStart { get; set; } 
 
         [JsonPropertyName("preferred_hours_end")]
-        public int PreferredHoursEnd { get; set; } // Zwykły int!
+        public int PreferredHoursEnd { get; set; } 
 
         [JsonPropertyName("forbidden_slots")]
         public List<int> ForbiddenSlots { get; set; } = new List<int>();
 
         [JsonPropertyName("min_start_hour")]
-        public int MinStartHour { get; set; } // Zwykły int!
+        public int MinStartHour { get; set; } 
 
         [JsonPropertyName("max_end_hour")]
-        public int MaxEndHour { get; set; } // Zwykły int!
+        public int MaxEndHour { get; set; } 
     }
 }
 
