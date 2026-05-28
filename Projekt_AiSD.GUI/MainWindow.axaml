@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+<!-- <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -6,4 +6,48 @@
         x:Class="Projekt_AiSD.GUI.MainWindow"
         Title="Projekt_AiSD.GUI">
     Welcome to Avalonia!
+</Window> -->
+
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Projekt_AiSD.GUI.MainWindow"
+        Title="Panel Wizualizacji Planu Zajęć - Moduł 4"
+        Width="1000" Height="750"
+        WindowStartupLocation="CenterScreen">
+
+    <TabControl>
+        <TabItem Header="Siatka Planu">
+            <Grid Margin="15">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Wygenerowany Plan Zajęć Uczelni" 
+                           FontSize="20" 
+                           FontWeight="Bold" 
+                           Margin="0,0,0,15"
+                           Foreground="#2b2b2b"/>
+
+                <DataGrid Grid.Row="1" 
+                          Name="PlanDataGrid" 
+                          AutoGenerateColumns="True" 
+                          IsReadOnly="True"
+                          GridLinesVisibility="All"
+                          BorderThickness="1" 
+                          BorderBrush="#cccccc"
+                          Background="White"/>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="Wykres Zbieżności">
+            <Grid Margin="15">
+                <TextBlock Text="Tutaj zostanie wyrysowany wykres postępu algorytmu (ScottPlot)" 
+                           VerticalAlignment="Center" 
+                           HorizontalAlignment="Center" 
+                           FontSize="16"
+                           Foreground="Gray"/>
+            </Grid>
+        </TabItem>
+    </TabControl>
 </Window>

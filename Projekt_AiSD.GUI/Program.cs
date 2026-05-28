@@ -15,11 +15,11 @@ namespace Projekt_AiSD.GUI
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
-                .UsePlatformDetect()
-#if DEBUG
-                .WithDeveloperTools()
-#endif
-                .WithInterFont()
-                .LogToTrace();
+                .UsePlatformDetect();
+// #if DEBUG
+//                 .WithDeveloperTools()
+// #endif
+//                 .WithInterFont()
+//                 .LogToTrace();
     }
 }
