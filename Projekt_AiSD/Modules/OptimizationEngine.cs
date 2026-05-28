@@ -185,8 +185,8 @@ namespace Projekt_AiSD.Modules
 
                         // Obsługa potencjalnych literówek z "Preffered" (podwójne f)
                         var prefDaysProp = prefType.GetProperty("PreferredDays") ?? prefType.GetProperty("PrefferedDays");
-                        var prefHoursStartProp = prefType.GetProperty("PreferredHoursStart") ?? prefType.GetProperty("PrefferedHoursStart");
-                        var prefHoursEndProp = prefType.GetProperty("PreferredHoursEnd") ?? prefType.GetProperty("PrefferedHoursEnd");
+                        var prefHoursStartProp = prefType.GetProperty("PreferredHoursStart") ?? prefType.GetProperty("PreferredHoursStart");
+                        var prefHoursEndProp = prefType.GetProperty("PreferredHoursEnd") ?? prefType.GetProperty("PreferredHoursEnd");
                         var minStartHourProp = prefType.GetProperty("MinStartHour") ?? prefType.GetProperty("min_start_hour");
                         var maxHoursProp = prefType.GetProperty("MaxHoursPerWeek") ?? prefType.GetProperty("max_hours_per_week");
 
