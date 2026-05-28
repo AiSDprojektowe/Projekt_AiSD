@@ -20,6 +20,8 @@ namespace Projekt_AiSD.Models
         [JsonPropertyName("capacity")]
         public int Capacity { get; set; }
 
-                                           
+        [JsonPropertyName("availability")]
+        public Dictionary<string, HashSet<int>> Availability { get; set; } = new Dictionary<string, HashSet<int>>();
+
     }
 }
