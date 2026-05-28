@@ -31,5 +31,10 @@ namespace Projekt_AiSD.Models
 
         [JsonPropertyName("required_room_type")]
         public string RequiredRoomType { get; set; }
+
+        /// <summary>
+        /// Oblicza godziny zajęć tygodniowo (semestr 14 tygodni, zaokrąglenie w górę)
+        /// </summary>
+        public int HoursPerWeek => (int)Math.Ceiling((double)HoursPerSemester / 14.0);
     }
 }
