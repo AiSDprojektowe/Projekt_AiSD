@@ -28,12 +28,22 @@
 
                     <DataGrid Grid.Row="1" 
                               Name="PlanDataGrid" 
-                              AutoGenerateColumns="True" 
+                              x:CompileBindings="False"
+                              AutoGenerateColumns="False" 
                               IsReadOnly="True"
                               GridLinesVisibility="All"
                               BorderThickness="1" 
                               BorderBrush="#cccccc"
-                              Background="White"/>
+                              >
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Dzień" Binding="{Binding DayName}" Width="120" />
+                            <DataGridTextColumn Header="Godziny" Binding="{Binding TimeRange}" Width="120" />
+                            <DataGridTextColumn Header="Przedmiot" Binding="{Binding CourseName}" Width="*" />
+                            <DataGridTextColumn Header="Grupa" Binding="{Binding GroupName}" Width="100" />
+                            <DataGridTextColumn Header="Prowadzący" Binding="{Binding InstructorName}" Width="250" />
+                            <DataGridTextColumn Header="Sala" Binding="{Binding RoomName}" Width="200" />
+                        </DataGrid.Columns>
+</DataGrid> 
                 </Grid>
             </TabItem>
 

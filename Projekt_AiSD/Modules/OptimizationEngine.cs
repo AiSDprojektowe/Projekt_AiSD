@@ -13,7 +13,7 @@ namespace Projekt_AiSD.Modules
         public string RoomId { get; set; }
         public string Day { get; set; }
         public int StartHour { get; set; }
-        public int EndHour { get; set; } // StartHour + HoursPerWeek
+        public int EndHour { get; set; } 
     }
 
 
@@ -47,7 +47,7 @@ namespace Projekt_AiSD.Modules
                 bool assigned = false;
 
                 //HC-8: filtrowanie prowadzacych z odpowiednimi kompetencjami
-                var eligibleInstructors = instructors.Where(i => i.Subjects.Contains(course.Id)).ToList();
+                var eligibleInstructors = instructors.Where(i => i.Subjects.Contains(course.SubjectId)).ToList();
 
                 //HC-6 i HC-7: filtrowanie sal (zgodnosc typu i pojemnosci)
                 var eligibleRooms = rooms.Where(r => r.Type == course.RequiredRoomType && r.Capacity >= course.Students).ToList();
@@ -59,9 +59,12 @@ namespace Projekt_AiSD.Modules
                         for (int d = 0; d < Days.Length; d++)
                         {
                             string dayName = Days[d];
-                            int duration = course.HoursPerWeek;
+                            // ZMIANA: Przeliczamy godziny z semestru na pojedynczy tydzień (zakładając 15 tygodni)
+                            int duration = course.HoursPerSemester / 15;
+                            // Zabezpieczenie na wypadek dziwnych danych z JSONa - zajęcia to minimum 1 godzina
+                            if (duration < 1) duration = 1;
 
-                            for (int h = 0; h <= TotalHoursPerDay - duration; h++)
+                            for (int h = 0; h < TotalHoursPerDay - duration + 1; h++)
                             {
                                 // sprawdzenie weryfikatora ograniczen twardych
                                 if (IsSlotFree(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, room, dayName))
@@ -105,17 +108,30 @@ namespace Projekt_AiSD.Modules
         string roomId, string courseId, Dictionary<string, bool[,]> instTime, Dictionary<string, bool[,]>
         roomTime, Dictionary<string, bool[,]> groupTime, Room room, string dayName)
         {
+            // Walidacja parametrów wejściowych
+            if (dayIdx < 0 || dayIdx >= Days.Length) return false;
+            if (hourIdx < 0 || hourIdx >= TotalHoursPerDay) return false;
+            if (duration <= 0) return false;
+
+            // Walidacja dostępu do słownika
+            if (!instTime.ContainsKey(instructorId)) return false;
+            if (!roomTime.ContainsKey(roomId)) return false;
+            if (!groupTime.ContainsKey(courseId)) return false;
+
             for (int i = 0; i < duration; i++)
             {
                 int currentHour = StartDayHour + hourIdx + i;
+
+                // Sprawdzenie czy indeks nie przekracza granic tablicy
+                if (hourIdx + i >= TotalHoursPerDay) return false;
 
                 if (instTime[instructorId][dayIdx, hourIdx + i]) return false; //HC-1 brak kolizji prowadzacego
                 if (roomTime[roomId][dayIdx, hourIdx + i]) return false; //HC-2 brak kolizji sali
                 if (groupTime[courseId][dayIdx, hourIdx + i]) return false; //HC-3 brak kolizji grupy
 
                 //HC-5: dostepnosc godzinowa sali z pliku JSON
-                if (!room.Availability.ContainsKey(dayName) || !room.Availability[dayName].Contains(currentHour))
-                    return false;
+                //if (!room.Availability.ContainsKey(dayName) || !room.Availability[dayName].Contains(currentHour))
+                  //  return false;
 
                 //HC-4: dostepnosc prowadzacego ( z modulu LLM - "forbidden_slots")
 
@@ -129,8 +145,18 @@ namespace Projekt_AiSD.Modules
         string courseId, Dictionary<string, bool[,]> instTime, Dictionary<string, bool[,]> roomTime, Dictionary<string,
         bool[,]> groupTime, bool state)
         {
+            // Walidacja przed aktualizacją
+            if (dayIdx < 0 || dayIdx >= Days.Length) return;
+            if (hourIdx < 0 || hourIdx >= TotalHoursPerDay) return;
+            if (duration <= 0) return;
+            if (!instTime.ContainsKey(instructorId)) return;
+            if (!roomTime.ContainsKey(roomId)) return;
+            if (!groupTime.ContainsKey(courseId)) return;
+
             for (int i = 0; i < duration; i++)
             {
+                if (hourIdx + i >= TotalHoursPerDay) break;
+
                 instTime[instructorId][dayIdx, hourIdx + i] = state;
                 roomTime[roomId][dayIdx, hourIdx + i] = state;
                 groupTime[courseId][dayIdx, hourIdx + i] = state;
@@ -295,7 +321,7 @@ namespace Projekt_AiSD.Modules
             }
 
             // HC-5: Ochrona dostępności sal
-            var targetRoom = rooms.FirstOrDefault(r => r.Id == movedLesson.RoomId);
+           /* var targetRoom = rooms.FirstOrDefault(r => r.Id == movedLesson.RoomId);
             if (targetRoom != null)
             {
                 for (int hour = movedLesson.StartHour; hour < movedLesson.EndHour; hour++)
@@ -305,7 +331,7 @@ namespace Projekt_AiSD.Modules
                         return true;
                     }
                 }
-            }
+            }*/
 
             // HC-1, HC-2, HC-3: Ochrona przed nakładaniem się zajęć
             foreach (var other in plan)

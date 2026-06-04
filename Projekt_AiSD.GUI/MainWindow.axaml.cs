@@ -95,13 +95,113 @@ namespace Projekt_AiSD.GUI
             }
         }
 
-        private void RunOptimizationBtn_Click(object sender, RoutedEventArgs e)
+        private async void RunOptimizationBtn_Click(object sender, RoutedEventArgs e)
         {
             Log("Uruchamianie silnika optymalizacji...");
 
-            // Miejsce na uruchomienie Algorytmu HC
+            var optBtn = this.FindControl<Button>("RunOptimizationBtn");
+            if (optBtn != null) optBtn.IsEnabled = false;
 
-            Log("Optymalizacja zakończona. Plan wygenerowany!");
+            try
+            {
+                // Weryfikacja, czy dane na pewno zostały wczytane
+                if (_universityData == null || _universityData.Instructors == null ||
+                    _universityData.Rooms == null || _universityData.Courses == null)
+                {
+                    throw new Exception("Brak pełnych danych! Najpierw wczytaj i przetwórz plik JSON.");
+                }
+
+                // Tworzymy instancję Twojego silnika z Modułu 2
+                OptimizationEngine engine = new OptimizationEngine();
+
+                Log("Krok 1/2: Generowanie planu bazowego (Ograniczenia Twarde)...");
+
+                // Wyrzucamy ciężkie obliczenia do osobnego wątku w tle (Task.Run)
+                var finalPlan = await Task.Run(() =>
+                {
+                    // 1. Uruchamiamy algorytm naiwny (HC)
+                    var basePlan = engine.RunOptimization(_universityData.Instructors, _universityData.Rooms, _universityData.Courses);
+
+                    // 2. Wrzucamy wynik do algorytmu optymalizującego (SC)
+                    return engine.OptimizeSoftConstraints(basePlan, _universityData.Instructors, _universityData.Rooms);
+                });
+
+                Log($"Optymalizacja zakończona! Wygenerowano {finalPlan.Count} kafelków zajęć.");
+
+                // Sukces! Podmieniamy dane w tabeli. 
+                // Zamiast listy prowadzących, DataGrid pokaże teraz gotowy plan zajęć.
+                // --- PROCES TŁUMACZENIA ID NA NAZWY ---
+                var displayPlan = finalPlan.Select(lesson => {
+                    // Wyszukujemy pełne obiekty na podstawie ID
+                    var course = _universityData.Courses.FirstOrDefault(c => c.Id == lesson.CourseId);
+                    var inst = _universityData.Instructors.FirstOrDefault(i => i.Id == lesson.InstructorId);
+                    var room = _universityData.Rooms.FirstOrDefault(r => r.Id == lesson.RoomId);
+
+                    // Tłumaczymy angielskie skróty i wymuszamy sortowanie dodając cyfry
+                    string polishDay = lesson.Day switch
+                    {
+                        "Mon" => "1. Poniedziałek",
+                        "Tue" => "2. Wtorek",
+                        "Wed" => "3. Środa",
+                        "Thu" => "4. Czwartek",
+                        "Fri" => "5. Piątek",
+                        _ => lesson.Day
+                    };
+
+                    return new DisplayLesson
+                    {
+                        DayName = polishDay,
+                        TimeRange = $"{lesson.StartHour}:00 - {lesson.EndHour}:00",
+                        CourseName = course != null ? course.Name : lesson.CourseId,
+                        GroupName = course != null ? course.GroupId : "-",
+                        InstructorName = inst != null ? inst.Name : lesson.InstructorId,
+                        RoomName = room != null ? $"{room.Name} ({room.Id})" : lesson.RoomId
+                    };
+
+                })
+                .OrderBy(l => l.DayName)       // Sortujemy najpierw po dniach
+                .ThenBy(l => l.TimeRange)      // Potem po godzinach
+                .ToList();
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    // W nowoczesnej Avalonii odwołujemy się do tabeli bezpośrednio po jej nazwie z XAML-a:
+                    if (PlanDataGrid != null)
+                    {
+                        PlanDataGrid.ItemsSource = displayPlan;
+                        Log($"Tabela odświeżona! Wyświetlam {displayPlan.Count} wierszy.");
+                    }
+                    else
+                    {
+                        Log("BŁĄD UI: Nie znaleziono kontrolki PlanDataGrid!");
+                    }
+                });
+
+                var tabela = this.FindControl<DataGrid>("PlanDataGrid");
+                if (tabela != null)
+                {
+                    // Wrzucamy nasze piękne, przetłumaczone i posortowane wiersze!
+                    tabela.ItemsSource = displayPlan;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"BŁĄD SILNIKA: {ex.Message}");
+            }
+            finally
+            {
+                if (optBtn != null) optBtn.IsEnabled = true;
+            }
         }
+    }
+    // Klasa reprezentująca jeden, ładny wiersz w naszej tabeli
+    public class DisplayLesson
+    {
+        public string DayName { get; set; }
+        public string TimeRange { get; set; }
+        public string CourseName { get; set; }
+        public string GroupName { get; set; }
+        public string InstructorName { get; set; }
+        public string RoomName { get; set; }
     }
 }
