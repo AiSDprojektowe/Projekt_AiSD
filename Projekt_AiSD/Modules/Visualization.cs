@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Projekt_AiSD.Modules
 {
-    internal class Visualization
+    internal static class Visualization
     {
+        public static IReadOnlyList<int> NormalizeConvergenceHistory(IReadOnlyList<int> values)
+        {
+            return values ?? Array.Empty<int>();
+        }
     }
 }
