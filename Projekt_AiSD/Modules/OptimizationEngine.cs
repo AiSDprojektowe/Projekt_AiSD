@@ -3,15 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Projekt_AiSD.Models;
 namespace Projekt_AiSD.Modules
 {
     public class ScheduledLesson
     {
-        public string CourseId { get; set; }
-        public string InstructorId { get; set; }
-        public string RoomId { get; set; }
-        public string Day { get; set; }
+        public string CourseId { get; set; } = string.Empty;
+        public string InstructorId { get; set; } = string.Empty;
+        public string RoomId { get; set; } = string.Empty;
+        public string Day { get; set; } = string.Empty;
         public int StartHour { get; set; }
         public int EndHour { get; set; } 
     }
@@ -24,6 +23,9 @@ namespace Projekt_AiSD.Modules
         private const int EndDayHour = 20;
         private const int TotalHoursPerDay = EndDayHour - StartDayHour;
 
+        public IReadOnlyList<int> LastHardConvergenceHistory { get; private set; } = Array.Empty<int>();
+        public IReadOnlyList<int> LastConvergenceHistory { get; private set; } = Array.Empty<int>();
+
 
         /// <summary>
         /// plan spełniający ograniczenia twarde.
@@ -33,10 +35,30 @@ namespace Projekt_AiSD.Modules
         {
             var finalPlan = new List<ScheduledLesson>();
 
+            var instructorPrefs = BuildInstructorPreferences(instructors);
+
             //szybkie macierze
             var instructorTimeline = instructors.ToDictionary(i => i.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
             var roomTimeline = rooms.ToDictionary(r => r.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
             var groupTimeline = courses.ToDictionary(c => c.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
+
+            var instructorIds = instructors.Select(i => i.Id).ToArray();
+            var courseIds = courses.Select(c => c.Id).ToArray();
+            var instructorTotalHours = instructors.ToDictionary(i => i.Id, _ => 0);
+            var instructorSchedule = instructors.ToDictionary(i => i.Id, _ => {
+                var arr = new List<ScheduledLesson>[5];
+                for (int d = 0; d < 5; d++) arr[d] = new List<ScheduledLesson>();
+                return arr;
+            });
+            var courseDays = courseIds.ToDictionary(id => id, _ => new HashSet<string>());
+            var courseLessonCount = courseIds.ToDictionary(id => id, _ => 0);
+            var groupSchedule = courseIds.ToDictionary(id => id, _ => {
+                var arr = new List<ScheduledLesson>[5];
+                for (int d = 0; d < 5; d++) arr[d] = new List<ScheduledLesson>();
+                return arr;
+            });
+            int[] lessonsPerDay = new int[5];
+            var convergenceHistory = new List<int> { 0 };
 
             //sortowanie od najwiekszej liczby studentow (najtrudniej dopasowac sale)
             var sortedCourses = courses.OrderByDescending(c => c.Students).ToList();
@@ -72,8 +94,7 @@ namespace Projekt_AiSD.Modules
                                     // rezerwacja miejsca w pamieci ( zaznaczamy jako zajete)
                                     UpdateTimelines(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, true);
 
-
-                                    finalPlan.Add(new ScheduledLesson
+                                    var scheduledLesson = new ScheduledLesson
                                     {
                                         CourseId = course.Id,
                                         InstructorId = instructor.Id,
@@ -81,7 +102,16 @@ namespace Projekt_AiSD.Modules
                                         Day = dayName,
                                         StartHour = StartDayHour + h,
                                         EndHour = StartDayHour + h + duration
-                                    });
+                                    };
+
+                                    finalPlan.Add(scheduledLesson);
+                                    instructorTotalHours[instructor.Id] += duration;
+                                    instructorSchedule[instructor.Id][d].Add(scheduledLesson);
+                                    courseDays[course.Id].Add(dayName);
+                                    courseLessonCount[course.Id]++;
+                                    groupSchedule[course.Id][d].Add(scheduledLesson);
+                                    lessonsPerDay[d]++;
+                                    convergenceHistory.Add(CalculateObjectiveValue(finalPlan, instructorPrefs, instructorIds, courseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay));
 
                                     assigned = true;
                                     break;
@@ -98,7 +128,42 @@ namespace Projekt_AiSD.Modules
                     Console.WriteLine($"[ALERT HC] Nie można usunąć kolizji twardych dla: {course.Name}");
                 }
             }
+
+            LastHardConvergenceHistory = convergenceHistory;
             return finalPlan;
+        }
+
+        private Dictionary<string, InstructorPref> BuildInstructorPreferences(List<Instructor> instructors)
+        {
+            var instructorPrefs = new Dictionary<string, InstructorPref>();
+
+            foreach (var inst in instructors)
+            {
+                var pref = new InstructorPref();
+                var prefs = inst.ParsedPreferences;
+
+                if (prefs != null)
+                {
+                    if (prefs.PreferredDays != null && prefs.PreferredDays.Count > 0)
+                    {
+                        pref.PreferredDays = new HashSet<string>(prefs.PreferredDays);
+                    }
+
+                    pref.PreferredHoursStart = prefs.PreferredHoursStart;
+                    pref.PreferredHoursEnd = prefs.PreferredHoursEnd;
+                    pref.MinStartHour = prefs.MinStartHour;
+                    pref.MaxHoursPerWeek = 16;
+
+                    if (prefs.ForbiddenSlots != null && prefs.ForbiddenSlots.Count > 0)
+                    {
+                        pref.ForbiddenSlots = new Dictionary<string, HashSet<int>>();
+                    }
+                }
+
+                instructorPrefs[inst.Id] = pref;
+            }
+
+            return instructorPrefs;
         }
 
 
@@ -203,7 +268,7 @@ namespace Projekt_AiSD.Modules
                 foreach (var inst in instructors)
                 {
                     var pref = new InstructorPref();
-                    object prefsObj = preferencesProp?.GetValue(inst);
+                    object? prefsObj = preferencesProp?.GetValue(inst);
 
                     if (prefsObj != null)
                     {
@@ -262,10 +327,11 @@ namespace Projekt_AiSD.Modules
             int[] lessonsPerDay = new int[5];
 
             // Obliczenie kary początkowej
-            int bestScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
+            int bestScore = CalculateObjectiveValue(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
             Random rnd = new Random();
             int maxIterations = 3000;
+            var convergenceHistory = new List<int>(maxIterations + 1) { bestScore };
 
             for (int i = 0; i < maxIterations; i++)
             {
@@ -287,7 +353,7 @@ namespace Projekt_AiSD.Modules
 
                 lesson.Day = newDay;
 
-                int currentScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
+                int currentScore = CalculateObjectiveValue(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
                 if (currentScore < bestScore)
                 {
@@ -297,9 +363,12 @@ namespace Projekt_AiSD.Modules
                 {
                     lesson.Day = oldDay; // Zmiana gorsza, cofamy (Rollback)
                 }
+
+                convergenceHistory.Add(bestScore);
             }
 
-            Console.WriteLine($"[Optymalizacja SC] Kara początkowa: {CalculatePenalty(initialPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay)} | Kara końcowa: {bestScore}");
+            LastConvergenceHistory = convergenceHistory;
+            Console.WriteLine($"[Optymalizacja SC] Wartość funkcji celu na starcie: {CalculateObjectiveValue(initialPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay)} | Wartość końcowa: {bestScore}");
             return bestPlan;
         }
 
@@ -353,7 +422,7 @@ namespace Projekt_AiSD.Modules
         /// <summary>
         /// Funkcja celu czyszcząca i ponownie wykorzystująca gotowe struktury (Zero-Allocation).
         /// </summary>
-        private int CalculatePenalty(
+        private int CalculateObjectiveValue(
             List<ScheduledLesson> plan,
             Dictionary<string, InstructorPref> instructorPrefs,
             string[] instructorIds,
@@ -365,7 +434,7 @@ namespace Projekt_AiSD.Modules
             Dictionary<string, List<ScheduledLesson>[]> groupSchedule,
             int[] lessonsPerDay)
         {
-            int penalty = 0;
+            int objectiveValue = 0;
 
             // Szybkie czyszczenie prealokowanych kontenerów (Zamiast "new" w pętli)
             for (int i = 0; i < instructorIds.Length; i++)
@@ -402,15 +471,15 @@ namespace Projekt_AiSD.Modules
                 {
                     if (pref.PreferredDays.Count > 0 && !pref.PreferredDays.Contains(l.Day))
                     {
-                        penalty += 100;
+                        objectiveValue += 100;
                     }
                     if (l.StartHour < pref.PreferredHoursStart || l.EndHour > pref.PreferredHoursEnd)
                     {
-                        penalty += 100;
+                        objectiveValue += 100;
                     }
                     if (l.StartHour < pref.MinStartHour)
                     {
-                        penalty += 100;
+                        objectiveValue += 100;
                     }
                 }
             }
@@ -422,7 +491,7 @@ namespace Projekt_AiSD.Modules
                 int hours = instructorTotalHours[instId];
                 if (instructorPrefs.TryGetValue(instId, out var pref) && hours > pref.MaxHoursPerWeek)
                 {
-                    penalty += (hours - pref.MaxHoursPerWeek) * 100;
+                    objectiveValue += (hours - pref.MaxHoursPerWeek) * 100;
                 }
             }
 
@@ -440,7 +509,7 @@ namespace Projekt_AiSD.Modules
                     for (int j = 0; j < dayLessons.Count - 1; j++)
                     {
                         int gap = dayLessons[j + 1].StartHour - dayLessons[j].EndHour;
-                        if (gap > 0) penalty += gap * 30;
+                        if (gap > 0) objectiveValue += gap * 30;
                     }
                 }
             }
@@ -451,7 +520,7 @@ namespace Projekt_AiSD.Modules
                 string cId = courseIds[i];
                 if (courseLessonCount[cId] > 1 && courseDays[cId].Count == 1)
                 {
-                    penalty += 30;
+                    objectiveValue += 30;
                 }
             }
 
@@ -472,7 +541,7 @@ namespace Projekt_AiSD.Modules
                         {
                             if (dayLessons[j].RoomId != dayLessons[j + 1].RoomId)
                             {
-                                penalty += 10;
+                                objectiveValue += 10;
                             }
                         }
                     }
@@ -489,10 +558,10 @@ namespace Projekt_AiSD.Modules
             }
             if (minLessons != int.MaxValue)
             {
-                penalty += (maxLessons - minLessons) * 5;
+                objectiveValue += (maxLessons - minLessons) * 5;
             }
 
-            return penalty;
+            return objectiveValue;
         }
 
         /// <summary>

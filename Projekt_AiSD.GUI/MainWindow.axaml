@@ -5,7 +5,7 @@
         Width="1000" Height="750"
         WindowStartupLocation="CenterScreen">
 
-    <Grid RowDefinitions="Auto, *, 150">
+    <Grid RowDefinitions="Auto, *, 180">
         
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="15">
             <Button Name="LoadDataBtn" Content="Wczytaj dane i parsuj LLM" Click="LoadDataBtn_Click" Padding="10,5" />
@@ -17,6 +17,7 @@
                 <Grid Margin="15">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -26,7 +27,13 @@
                                Margin="0,0,0,15"
                                Foreground="#2b2b2b"/>
 
-                    <DataGrid Grid.Row="1" 
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,10">
+                        <ComboBox Name="FilterInstructorCombo" Width="220" PlaceholderText="Filtr prowadzącego" />
+                        <ComboBox Name="FilterRoomCombo" Width="220" PlaceholderText="Filtr sali" />
+                        <ComboBox Name="FilterGroupCombo" Width="220" PlaceholderText="Filtr grupy" />
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="2" 
                               Name="PlanDataGrid" 
                               x:CompileBindings="False"
                               AutoGenerateColumns="False" 
@@ -39,6 +46,7 @@
                             <DataGridTextColumn Header="Dzień" Binding="{Binding DayName}" Width="120" />
                             <DataGridTextColumn Header="Godziny" Binding="{Binding TimeRange}" Width="120" />
                             <DataGridTextColumn Header="Przedmiot" Binding="{Binding CourseName}" Width="*" />
+                            <DataGridTextColumn Header="Typ" Binding="{Binding CourseType}" Width="110" />
                             <DataGridTextColumn Header="Grupa" Binding="{Binding GroupName}" Width="100" />
                             <DataGridTextColumn Header="Prowadzący" Binding="{Binding InstructorName}" Width="250" />
                             <DataGridTextColumn Header="Sala" Binding="{Binding RoomName}" Width="200" />
@@ -49,11 +57,45 @@
 
             <TabItem Header="Wykres Zbieżności">
                 <Grid Margin="15">
-                    <TextBlock Text="Tutaj zostanie wyrysowany wykres postępu algorytmu (ScottPlot)" 
-                               VerticalAlignment="Center" 
-                               HorizontalAlignment="Center" 
-                               FontSize="16"
-                               Foreground="Gray"/>
+                    <Border BorderBrush="#cccccc" BorderThickness="1" CornerRadius="6" Background="White">
+                        <Canvas Name="ConvergenceCanvas" Background="White" Width="900" Height="500" />
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Raport Statystyczny">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Raport statystyczny optymalizacji" FontSize="20" FontWeight="Bold" Margin="0,0,0,12" />
+
+                    <TextBlock Grid.Row="1" Name="SoftConstraintsSummary" Text="Brak danych statystycznych." TextWrapping="Wrap" Margin="0,0,0,10" />
+
+                    <Border Grid.Row="2" BorderBrush="#cccccc" BorderThickness="1" CornerRadius="6" Background="White" Margin="0,0,0,10">
+                        <Canvas Name="StatisticsCanvas" Background="White" Height="240" />
+                    </Border>
+
+                    <Border Grid.Row="3" BorderBrush="#cccccc" BorderThickness="1" CornerRadius="6" Background="White">
+                        <DataGrid Name="RoomUtilizationGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  GridLinesVisibility="All"
+                                  BorderThickness="0"
+                                  Background="White"
+                                  Height="320">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Sala" Binding="{Binding RoomName}" Width="*" />
+                                <DataGridTextColumn Header="Zajęte sloty" Binding="{Binding UsedSlots}" Width="120" />
+                                <DataGridTextColumn Header="Wykorzystanie" Binding="{Binding UtilizationText}" Width="140" />
+                                <DataGridTextColumn Header="Komentarz" Binding="{Binding Comment}" Width="2*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
                 </Grid>
             </TabItem>
         </TabControl>
