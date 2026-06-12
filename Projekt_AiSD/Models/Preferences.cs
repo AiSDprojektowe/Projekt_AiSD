@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Projekt_AiSD.Models
@@ -11,19 +10,19 @@ namespace Projekt_AiSD.Models
         public List<string> PreferredDays { get; set; } = new List<string>();
 
         [JsonPropertyName("preferred_hours_start")]
-        public int PreferredHoursStart { get; set; } 
+        public int PreferredHoursStart { get; set; }
 
         [JsonPropertyName("preferred_hours_end")]
-        public int PreferredHoursEnd { get; set; } 
+        public int PreferredHoursEnd { get; set; }
+
 
         [JsonPropertyName("forbidden_slots")]
-        public List<int> ForbiddenSlots { get; set; } = new List<int>();
+        public Dictionary<string, List<int>> ForbiddenSlots { get; set; } = new Dictionary<string, List<int>>();
 
         [JsonPropertyName("min_start_hour")]
-        public int MinStartHour { get; set; } 
+        public int MinStartHour { get; set; }
 
         [JsonPropertyName("max_end_hour")]
-        public int MaxEndHour { get; set; } 
+        public int MaxEndHour { get; set; }
     }
 }
-

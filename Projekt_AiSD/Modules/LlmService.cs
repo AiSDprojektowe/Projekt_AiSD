@@ -29,20 +29,26 @@ namespace Projekt_AiSD.Modules
             }
         }
 
-        // NOWA METODA: Przyjmuje paczkę prowadzących i zwraca Słownik <ID_Prowadzącego, Preferencje>
+
         public async Task<Dictionary<string, Preferences>?> ParsePreferencesBatch(Instructor[] instructorsBatch)
         {
             var systemPrompt =
                 """
-                Jesteś parserem preferencji prowadzących.
-                Zwracaj WYŁĄCZNIE poprawny JSON bez markdown formatting.
-                Wymagany format to obiekt, gdzie KLUCZEM jest ID prowadzącego, a WARTOŚCIĄ jego zdekodowane preferencje.
-                Dni: "monday", "tuesday", "wednesday", "thursday", "friday". Godziny to liczby od 8 do 18.
+                Jesteś wysoce precyzyjnym parserem preferencji prowadzących uczelni. 
+                Analizujesz tekst i zwracasz WYŁĄCZNIE czysty JSON.
+                
+                ZASADY PARSOWANIA:
+                1. Dni tygodnia to ściśle: "monday", "tuesday", "wednesday", "thursday", "friday".
+                2. Godziny to liczby całkowite od 8 do 20.
+                3. "MOGĘ" -> określa preferred_days, preferred_hours_start, preferred_hours_end, min_start_hour, max_end_hour.
+                4. "NIE MOGĘ" (lub inne zakazy godzinowe) -> MUSZĄ zostać przekonwertowane na forbidden_slots. 
+                   Pole forbidden_slots to obiekt (słownik), gdzie kluczem jest nazwa dnia w j. angielskim, a wartością lista WSZYSTKICH zakazanych godzin. 
+                   Przykład: "nie mogę w piątek po 14" -> "friday": [14, 15, 16, 17, 18, 19, 20]. "nie mogę w środę rano do 10" -> "wednesday": [8, 9]. "nie mogę w poniedziałki" -> "monday": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].
+                5. Zwracasz obiekt JSON, gdzie KLUCZEM jest ID prowadzącego.
                 """;
 
-            // Budujemy dynamiczny tekst zapytania z ID każdego prowadzącego z paczki
             var promptBuilder = new StringBuilder();
-            promptBuilder.AppendLine("Przeanalizuj poniższe teksty i zwróć ich preferencje w formacie JSON:");
+            promptBuilder.AppendLine("Przeanalizuj poniższe teksty i zwróć ich preferencje w wymaganym formacie JSON:");
 
             foreach (var instructor in instructorsBatch)
             {
@@ -52,10 +58,19 @@ namespace Projekt_AiSD.Modules
             }
 
             var userPrompt = promptBuilder.ToString() +
-                "\nOczekiwany format JSON:\n" +
+                "\nOczekiwany format JSON (ZWRÓĆ TYLKO TO, BEZ KOMENTARZY):\n" +
                 "{\n" +
-                "  \"I01\": { \"preferred_days\": [\"monday\"], \"preferred_hours_start\": 8, \"preferred_hours_end\": 18, \"forbidden_slots\": [], \"min_start_hour\": 8, \"max_end_hour\": 18 },\n" +
-                "  \"I02\": { ... }\n" +
+                "  \"ID_PROWADZACEGO\": {\n" +
+                "    \"preferred_days\": [\"monday\", \"tuesday\"],\n" +
+                "    \"preferred_hours_start\": 8,\n" +
+                "    \"preferred_hours_end\": 16,\n" +
+                "    \"forbidden_slots\": {\n" +
+                "      \"friday\": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],\n" +
+                "      \"wednesday\": [8, 9]\n" +
+                "    },\n" +
+                "    \"min_start_hour\": 8,\n" +
+                "    \"max_end_hour\": 20\n" +
+                "  }\n" +
                 "}";
 
             var body = new
@@ -80,7 +95,7 @@ namespace Projekt_AiSD.Modules
             return ParseBatchResponse(responseText);
         }
 
-        // Dekoder dla nowej, słownikowej struktury
+
         private Dictionary<string, Preferences>? ParseBatchResponse(string response)
         {
             try
