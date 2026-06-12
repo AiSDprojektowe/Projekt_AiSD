@@ -2,8 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Projekt_AiSD.Models;
+
 namespace Projekt_AiSD.Modules
 {
     public class ScheduledLesson
@@ -13,9 +12,8 @@ namespace Projekt_AiSD.Modules
         public string RoomId { get; set; }
         public string Day { get; set; }
         public int StartHour { get; set; }
-        public int EndHour { get; set; } 
+        public int EndHour { get; set; }
     }
-
 
     public class OptimizationEngine
     {
@@ -24,32 +22,89 @@ namespace Projekt_AiSD.Modules
         private const int EndDayHour = 20;
         private const int TotalHoursPerDay = EndDayHour - StartDayHour;
 
+        // Pomocnicza klasa cache'ująca strukturę
+        private class InstructorPref
+        {
+            public HashSet<string> PreferredDays { get; set; } = new HashSet<string>();
+            public int PreferredHoursStart { get; set; } = 8;
+            public int PreferredHoursEnd { get; set; } = 20;
+            public int MinStartHour { get; set; } = 8;
+            public int MaxHoursPerWeek { get; set; } = 16;
+            public Dictionary<string, HashSet<int>> ForbiddenSlots { get; set; } = new Dictionary<string, HashSet<int>>();
+        }
 
-        /// <summary>
-        /// plan spełniający ograniczenia twarde.
-        /// </summary>
+
+        private Dictionary<string, InstructorPref> LoadPreferences(List<Instructor> instructors)
+        {
+            var instructorPrefs = new Dictionary<string, InstructorPref>();
+            var firstInst = instructors.FirstOrDefault();
+
+            if (firstInst != null)
+            {
+                var type = firstInst.GetType();
+
+                var preferencesProp = type.GetProperty("ParsedPreferences") ?? type.GetProperty("Preferences") ?? type.GetProperty("preferences");
+
+                foreach (var inst in instructors)
+                {
+                    var pref = new InstructorPref();
+
+                    if (preferencesProp != null)
+                    {
+                        object prefsObj = preferencesProp.GetValue(inst);
+                        if (prefsObj != null)
+                        {
+                            var prefType = prefsObj.GetType();
+
+                            var prefDaysProp = prefType.GetProperty("PreferredDays") ?? prefType.GetProperty("PrefferedDays");
+                            var prefHoursStartProp = prefType.GetProperty("PreferredHoursStart") ?? prefType.GetProperty("PreferredHoursStart");
+                            var prefHoursEndProp = prefType.GetProperty("PreferredHoursEnd") ?? prefType.GetProperty("PreferredHoursEnd");
+                            var minStartHourProp = prefType.GetProperty("MinStartHour") ?? prefType.GetProperty("min_start_hour");
+                            var maxHoursProp = prefType.GetProperty("MaxHoursPerWeek") ?? prefType.GetProperty("max_hours_per_week");
+                            var forbiddenSlotsProp = prefType.GetProperty("ForbiddenSlots") ?? type.GetProperty("ForbiddenSlots");
+
+                            if (prefDaysProp != null && prefDaysProp.GetValue(prefsObj) is IEnumerable<string> days)
+                                pref.PreferredDays = new HashSet<string>(days.Select(MapDayToShort));
+
+                            pref.PreferredHoursStart = (prefHoursStartProp?.GetValue(prefsObj) as int?) ?? 8;
+                            pref.PreferredHoursEnd = (prefHoursEndProp?.GetValue(prefsObj) as int?) ?? 20;
+                            pref.MinStartHour = (minStartHourProp?.GetValue(prefsObj) as int?) ?? 8;
+                            pref.MaxHoursPerWeek = (maxHoursProp?.GetValue(prefsObj) as int?) ?? 16;
+
+                            if (forbiddenSlotsProp != null)
+                            {
+                                object fSlotsSource = prefType.GetProperty("ForbiddenSlots") != null ? prefsObj : inst;
+
+                                if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, List<int>> fList)
+                                    pref.ForbiddenSlots = fList.ToDictionary(p => MapDayToShort(p.Key), p => new HashSet<int>(p.Value));
+                                else if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, HashSet<int>> fHash)
+                                    pref.ForbiddenSlots = fHash.ToDictionary(p => MapDayToShort(p.Key), p => p.Value);
+                            }
+                        }
+                    }
+                    instructorPrefs[inst.Id] = pref;
+                }
+            }
+            return instructorPrefs;
+        }
 
         public List<ScheduledLesson> RunOptimization(List<Instructor> instructors, List<Room> rooms, List<Course> courses)
         {
             var finalPlan = new List<ScheduledLesson>();
 
-            //szybkie macierze
+
+            var instructorPrefs = LoadPreferences(instructors);
+
             var instructorTimeline = instructors.ToDictionary(i => i.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
             var roomTimeline = rooms.ToDictionary(r => r.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
             var groupTimeline = courses.ToDictionary(c => c.Id, _ => new bool[Days.Length, TotalHoursPerDay]);
 
-            //sortowanie od najwiekszej liczby studentow (najtrudniej dopasowac sale)
             var sortedCourses = courses.OrderByDescending(c => c.Students).ToList();
-
 
             foreach (var course in sortedCourses)
             {
                 bool assigned = false;
-
-                //HC-8: filtrowanie prowadzacych z odpowiednimi kompetencjami
                 var eligibleInstructors = instructors.Where(i => i.Subjects.Contains(course.SubjectId)).ToList();
-
-                //HC-6 i HC-7: filtrowanie sal (zgodnosc typu i pojemnosci)
                 var eligibleRooms = rooms.Where(r => r.Type == course.RequiredRoomType && r.Capacity >= course.Students).ToList();
 
                 foreach (var instructor in eligibleInstructors)
@@ -59,19 +114,15 @@ namespace Projekt_AiSD.Modules
                         for (int d = 0; d < Days.Length; d++)
                         {
                             string dayName = Days[d];
-                            // ZMIANA: Przeliczamy godziny z semestru na pojedynczy tydzień (zakładając 15 tygodni)
                             int duration = course.HoursPerSemester / 15;
-                            // Zabezpieczenie na wypadek dziwnych danych z JSONa - zajęcia to minimum 1 godzina
                             if (duration < 1) duration = 1;
 
                             for (int h = 0; h < TotalHoursPerDay - duration + 1; h++)
                             {
-                                // sprawdzenie weryfikatora ograniczen twardych
-                                if (IsSlotFree(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, room, dayName))
-                                {
-                                    // rezerwacja miejsca w pamieci ( zaznaczamy jako zajete)
-                                    UpdateTimelines(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, true);
 
+                                if (IsSlotFree(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, dayName, instructorPrefs))
+                                {
+                                    UpdateTimelines(d, h, duration, instructor.Id, room.Id, course.Id, instructorTimeline, roomTimeline, groupTimeline, true);
 
                                     finalPlan.Add(new ScheduledLesson
                                     {
@@ -101,19 +152,14 @@ namespace Projekt_AiSD.Modules
             return finalPlan;
         }
 
-
-        // WERYFIKATOR OGRANICZEN TWARDYCH
-
         private bool IsSlotFree(int dayIdx, int hourIdx, int duration, string instructorId,
         string roomId, string courseId, Dictionary<string, bool[,]> instTime, Dictionary<string, bool[,]>
-        roomTime, Dictionary<string, bool[,]> groupTime, Room room, string dayName)
+        roomTime, Dictionary<string, bool[,]> groupTime, string dayName, Dictionary<string, InstructorPref> prefs)
         {
-            // Walidacja parametrów wejściowych
             if (dayIdx < 0 || dayIdx >= Days.Length) return false;
             if (hourIdx < 0 || hourIdx >= TotalHoursPerDay) return false;
             if (duration <= 0) return false;
 
-            // Walidacja dostępu do słownika
             if (!instTime.ContainsKey(instructorId)) return false;
             if (!roomTime.ContainsKey(roomId)) return false;
             if (!groupTime.ContainsKey(courseId)) return false;
@@ -121,22 +167,17 @@ namespace Projekt_AiSD.Modules
             for (int i = 0; i < duration; i++)
             {
                 int currentHour = StartDayHour + hourIdx + i;
-
-                // Sprawdzenie czy indeks nie przekracza granic tablicy
                 if (hourIdx + i >= TotalHoursPerDay) return false;
 
-                if (instTime[instructorId][dayIdx, hourIdx + i]) return false; //HC-1 brak kolizji prowadzacego
-                if (roomTime[roomId][dayIdx, hourIdx + i]) return false; //HC-2 brak kolizji sali
-                if (groupTime[courseId][dayIdx, hourIdx + i]) return false; //HC-3 brak kolizji grupy
-
-                //HC-5: dostepnosc godzinowa sali z pliku JSON
-                //if (!room.Availability.ContainsKey(dayName) || !room.Availability[dayName].Contains(currentHour))
-                  //  return false;
-
-                //HC-4: dostepnosc prowadzacego ( z modulu LLM - "forbidden_slots")
+                if (instTime[instructorId][dayIdx, hourIdx + i]) return false;
+                if (roomTime[roomId][dayIdx, hourIdx + i]) return false;
+                if (groupTime[courseId][dayIdx, hourIdx + i]) return false;
 
 
-                //^^^wyzej wkleic strukture od danych/llm
+                if (prefs.TryGetValue(instructorId, out var p) && p.ForbiddenSlots.ContainsKey(dayName))
+                {
+                    if (p.ForbiddenSlots[dayName].Contains(currentHour)) return false;
+                }
             }
             return true;
         }
@@ -145,7 +186,6 @@ namespace Projekt_AiSD.Modules
         string courseId, Dictionary<string, bool[,]> instTime, Dictionary<string, bool[,]> roomTime, Dictionary<string,
         bool[,]> groupTime, bool state)
         {
-            // Walidacja przed aktualizacją
             if (dayIdx < 0 || dayIdx >= Days.Length) return;
             if (hourIdx < 0 || hourIdx >= TotalHoursPerDay) return;
             if (duration <= 0) return;
@@ -156,29 +196,12 @@ namespace Projekt_AiSD.Modules
             for (int i = 0; i < duration; i++)
             {
                 if (hourIdx + i >= TotalHoursPerDay) break;
-
                 instTime[instructorId][dayIdx, hourIdx + i] = state;
                 roomTime[roomId][dayIdx, hourIdx + i] = state;
                 groupTime[courseId][dayIdx, hourIdx + i] = state;
             }
         }
 
-        //ograniczenia miekkie
-
-        // Pomocnicza klasa cache'ująca strukturę prowadzących bez ciągłej refleksji
-        private class InstructorPref
-        {
-            public HashSet<string> PreferredDays { get; set; } = new HashSet<string>();
-            public int PreferredHoursStart { get; set; } = 8;
-            public int PreferredHoursEnd { get; set; } = 20;
-            public int MinStartHour { get; set; } = 8;
-            public int MaxHoursPerWeek { get; set; } = 16;
-            public Dictionary<string, HashSet<int>> ForbiddenSlots { get; set; } = new Dictionary<string, HashSet<int>>();
-        }
-
-        /// <summary>
-        /// Optymalizuje ograniczenia miękkie bez naruszania ograniczeń twardych Marysi.
-        /// </summary>
         public List<ScheduledLesson> OptimizeSoftConstraints(List<ScheduledLesson> initialPlan, List<Instructor> instructors, List<Room> rooms)
         {
             var bestPlan = initialPlan.Select(l => new ScheduledLesson
@@ -191,57 +214,9 @@ namespace Projekt_AiSD.Modules
                 EndHour = l.EndHour
             }).ToList();
 
-            // 1. CACHOWANIE REFLEKSJI (Wchodzimy do klasy Preferences i obsługujemy literówki)
-            var instructorPrefs = new Dictionary<string, InstructorPref>();
-            var firstInst = instructors.FirstOrDefault();
 
-            if (firstInst != null)
-            {
-                var type = firstInst.GetType();
-                var preferencesProp = type.GetProperty("Preferences") ?? type.GetProperty("preferences");
+            var instructorPrefs = LoadPreferences(instructors);
 
-                foreach (var inst in instructors)
-                {
-                    var pref = new InstructorPref();
-                    object prefsObj = preferencesProp?.GetValue(inst);
-
-                    if (prefsObj != null)
-                    {
-                        var prefType = prefsObj.GetType();
-
-                        // Obsługa potencjalnych literówek z "Preffered" (podwójne f)
-                        var prefDaysProp = prefType.GetProperty("PreferredDays") ?? prefType.GetProperty("PrefferedDays");
-                        var prefHoursStartProp = prefType.GetProperty("PreferredHoursStart") ?? prefType.GetProperty("PreferredHoursStart");
-                        var prefHoursEndProp = prefType.GetProperty("PreferredHoursEnd") ?? prefType.GetProperty("PreferredHoursEnd");
-                        var minStartHourProp = prefType.GetProperty("MinStartHour") ?? prefType.GetProperty("min_start_hour");
-                        var maxHoursProp = prefType.GetProperty("MaxHoursPerWeek") ?? prefType.GetProperty("max_hours_per_week");
-
-                        var forbiddenSlotsProp = prefType.GetProperty("ForbiddenSlots") ?? type.GetProperty("ForbiddenSlots");
-
-                        if (prefDaysProp != null && prefDaysProp.GetValue(prefsObj) is IEnumerable<string> days)
-                            pref.PreferredDays = new HashSet<string>(days);
-
-                        pref.PreferredHoursStart = (prefHoursStartProp?.GetValue(prefsObj) as int?) ?? 8;
-                        pref.PreferredHoursEnd = (prefHoursEndProp?.GetValue(prefsObj) as int?) ?? 20;
-                        pref.MinStartHour = (minStartHourProp?.GetValue(prefsObj) as int?) ?? 8;
-                        pref.MaxHoursPerWeek = (maxHoursProp?.GetValue(prefsObj) as int?) ?? 16;
-
-                        if (forbiddenSlotsProp != null)
-                        {
-                            object fSlotsSource = prefType.GetProperty("ForbiddenSlots") != null ? prefsObj : inst;
-
-                            if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, List<int>> fList)
-                                pref.ForbiddenSlots = fList.ToDictionary(p => p.Key, p => new HashSet<int>(p.Value));
-                            else if (forbiddenSlotsProp.GetValue(fSlotsSource) is Dictionary<string, HashSet<int>> fHash)
-                                pref.ForbiddenSlots = fHash;
-                        }
-                    }
-
-                    instructorPrefs[inst.Id] = pref;
-                }
-            }
-
-            // 2. PREALOKACJA BUFORÓW (Zapobiega obciążeniu Garbage Collectora w pętli)
             var instructorTotalHours = instructors.ToDictionary(i => i.Id, _ => 0);
             var instructorSchedule = instructors.ToDictionary(i => i.Id, _ => {
                 var arr = new List<ScheduledLesson>[5];
@@ -261,11 +236,10 @@ namespace Projekt_AiSD.Modules
             var instructorIds = instructors.Select(i => i.Id).ToArray();
             int[] lessonsPerDay = new int[5];
 
-            // Obliczenie kary początkowej
             int bestScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
             Random rnd = new Random();
-            int maxIterations = 3000;
+            int maxIterations = 50000;
 
             for (int i = 0; i < maxIterations; i++)
             {
@@ -275,27 +249,38 @@ namespace Projekt_AiSD.Modules
                 var lesson = bestPlan[randomLessonIndex];
 
                 string oldDay = lesson.Day;
+                int oldStartHour = lesson.StartHour;
+                int oldEndHour = lesson.EndHour;
+
                 string newDay = Days[rnd.Next(Days.Length)];
+                int duration = oldEndHour - oldStartHour;
+                int newStartHour = StartDayHour + rnd.Next(TotalHoursPerDay - duration + 1);
 
-                if (oldDay == newDay) continue;
+                if (oldDay == newDay && oldStartHour == newStartHour) continue;
 
-                // Weryfikacja twardych ograniczeń
-                if (CausesHardConstraintViolation(bestPlan, lesson, newDay, rooms, instructorPrefs))
+                lesson.Day = newDay;
+                lesson.StartHour = newStartHour;
+                lesson.EndHour = newStartHour + duration;
+
+                if (CausesHardConstraintViolation(bestPlan, lesson, newDay, instructorPrefs))
                 {
+                    lesson.Day = oldDay;
+                    lesson.StartHour = oldStartHour;
+                    lesson.EndHour = oldEndHour;
                     continue;
                 }
 
-                lesson.Day = newDay;
-
                 int currentScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
-                if (currentScore < bestScore)
+                if (currentScore <= bestScore)
                 {
-                    bestScore = currentScore; // Zmiana na plus, akceptujemy
+                    bestScore = currentScore;
                 }
                 else
                 {
-                    lesson.Day = oldDay; // Zmiana gorsza, cofamy (Rollback)
+                    lesson.Day = oldDay;
+                    lesson.StartHour = oldStartHour;
+                    lesson.EndHour = oldEndHour;
                 }
             }
 
@@ -303,37 +288,19 @@ namespace Projekt_AiSD.Modules
             return bestPlan;
         }
 
-        /// <summary>
-        /// Szybka weryfikacja O(N) uwzględniająca zarówno nakładanie się, jak i zakazy godzinowe LLM (HC-4).
-        /// </summary>
-        private bool CausesHardConstraintViolation(List<ScheduledLesson> plan, ScheduledLesson movedLesson, string targetDay, List<Room> rooms, Dictionary<string, InstructorPref> instructorPrefs)
+        private bool CausesHardConstraintViolation(List<ScheduledLesson> plan, ScheduledLesson movedLesson, string targetDay, Dictionary<string, InstructorPref> instructorPrefs)
         {
-            // HC-4: Ochrona dostępności godzinowej prowadzącego przekazanej z modułu LLM
             if (instructorPrefs.TryGetValue(movedLesson.InstructorId, out var pref) && pref.ForbiddenSlots != null)
             {
                 if (pref.ForbiddenSlots.TryGetValue(targetDay, out var forbiddenHours))
                 {
                     for (int hour = movedLesson.StartHour; hour < movedLesson.EndHour; hour++)
                     {
-                        if (forbiddenHours.Contains(hour)) return true; // Trafiono w zabroniony slot z LLM!
+                        if (forbiddenHours.Contains(hour)) return true;
                     }
                 }
             }
 
-            // HC-5: Ochrona dostępności sal
-           /* var targetRoom = rooms.FirstOrDefault(r => r.Id == movedLesson.RoomId);
-            if (targetRoom != null)
-            {
-                for (int hour = movedLesson.StartHour; hour < movedLesson.EndHour; hour++)
-                {
-                    if (!targetRoom.Availability.ContainsKey(targetDay) || !targetRoom.Availability[targetDay].Contains(hour))
-                    {
-                        return true;
-                    }
-                }
-            }*/
-
-            // HC-1, HC-2, HC-3: Ochrona przed nakładaniem się zajęć
             foreach (var other in plan)
             {
                 if (other == movedLesson) continue;
@@ -350,9 +317,6 @@ namespace Projekt_AiSD.Modules
             return false;
         }
 
-        /// <summary>
-        /// Funkcja celu czyszcząca i ponownie wykorzystująca gotowe struktury (Zero-Allocation).
-        /// </summary>
         private int CalculatePenalty(
             List<ScheduledLesson> plan,
             Dictionary<string, InstructorPref> instructorPrefs,
@@ -367,7 +331,6 @@ namespace Projekt_AiSD.Modules
         {
             int penalty = 0;
 
-            // Szybkie czyszczenie prealokowanych kontenerów (Zamiast "new" w pętli)
             for (int i = 0; i < instructorIds.Length; i++)
             {
                 instructorTotalHours[instructorIds[i]] = 0;
@@ -383,7 +346,6 @@ namespace Projekt_AiSD.Modules
             }
             Array.Clear(lessonsPerDay, 0, 5);
 
-            // Jeden liniowy przebieg agregujący dane z aktualnego stanu planu
             foreach (var l in plan)
             {
                 int dayIdx = GetDayIndex(l.Day);
@@ -397,7 +359,6 @@ namespace Projekt_AiSD.Modules
                 courseLessonCount[l.CourseId]++;
                 groupSchedule[l.CourseId][dayIdx].Add(l);
 
-                // SC-1: Preferencje prowadzących (WAGA: 100)
                 if (instructorPrefs.TryGetValue(l.InstructorId, out var pref))
                 {
                     if (pref.PreferredDays.Count > 0 && !pref.PreferredDays.Contains(l.Day))
@@ -415,7 +376,6 @@ namespace Projekt_AiSD.Modules
                 }
             }
 
-            // SC-6: Maksymalne obciążenie tygodniowe prowadzącego (WAGA: 100 za każdą nadgodzinę)
             for (int i = 0; i < instructorIds.Length; i++)
             {
                 string instId = instructorIds[i];
@@ -426,7 +386,6 @@ namespace Projekt_AiSD.Modules
                 }
             }
 
-            // SC-2: Minimalizacja okienek dla prowadzących (WAGA: 30 za godzinę przerwy)
             for (int i = 0; i < instructorIds.Length; i++)
             {
                 var daysArray = instructorSchedule[instructorIds[i]];
@@ -445,7 +404,6 @@ namespace Projekt_AiSD.Modules
                 }
             }
 
-            // SC-3: Wykład i lab tego samego przedmiotu w różne dni (WAGA: 30)
             for (int i = 0; i < courseIds.Length; i++)
             {
                 string cId = courseIds[i];
@@ -455,7 +413,6 @@ namespace Projekt_AiSD.Modules
                 }
             }
 
-            // SC-5: Przemieszczanie się studentów - zajęcia POD RZĄD w różnych salach (WAGA: 10)
             for (int i = 0; i < courseIds.Length; i++)
             {
                 var daysArray = groupSchedule[courseIds[i]];
@@ -479,7 +436,6 @@ namespace Projekt_AiSD.Modules
                 }
             }
 
-            // SC-4: Równomierne rozłożenie obciążenia na dni tygodnia (WAGA: 5)
             int maxLessons = 0;
             int minLessons = int.MaxValue;
             for (int d = 0; d < 5; d++)
@@ -495,9 +451,6 @@ namespace Projekt_AiSD.Modules
             return penalty;
         }
 
-        /// <summary>
-        /// Mapuje skrót nazwy dnia tygodnia na indeks tablicy (0-4).
-        /// </summary>
         private int GetDayIndex(string day)
         {
             switch (day)
@@ -510,5 +463,19 @@ namespace Projekt_AiSD.Modules
                 default: return -1;
             }
         }
-    } // Zamyka klasę OptimizationEngine
-} // Zamyka namespace Projekt_AiSD.Modules
+
+        private string MapDayToShort(string fullDay)
+        {
+            if (string.IsNullOrEmpty(fullDay)) return fullDay;
+            switch (fullDay.ToLower().Trim())
+            {
+                case "monday": return "Mon";
+                case "tuesday": return "Tue";
+                case "wednesday": return "Wed";
+                case "thursday": return "Thu";
+                case "friday": return "Fri";
+                default: return fullDay;
+            }
+        }
+    }
+}
