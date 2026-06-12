@@ -1,13 +1,3 @@
-<!-- <Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        x:Class="Projekt_AiSD.GUI.MainWindow"
-        Title="Projekt_AiSD.GUI">
-    Welcome to Avalonia!
-</Window> -->
-
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Projekt_AiSD.GUI.MainWindow"
@@ -15,39 +5,68 @@
         Width="1000" Height="750"
         WindowStartupLocation="CenterScreen">
 
-    <TabControl>
-        <TabItem Header="Siatka Planu">
-            <Grid Margin="15">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+    <Grid RowDefinitions="Auto, *, 150">
+        
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="15">
+            <Button Name="LoadDataBtn" Content="Wczytaj dane i parsuj LLM" Click="LoadDataBtn_Click" Padding="10,5" />
+            <Button Name="RunOptimizationBtn" Content="Uruchom Silnik Optymalizacji" Click="RunOptimizationBtn_Click" IsEnabled="False" Padding="10,5" />
+        </StackPanel>
 
-                <TextBlock Text="Wygenerowany Plan Zajęć Uczelni" 
-                           FontSize="20" 
-                           FontWeight="Bold" 
-                           Margin="0,0,0,15"
-                           Foreground="#2b2b2b"/>
+        <TabControl Grid.Row="1" Margin="10,0,10,0">
+            <TabItem Header="Siatka Planu">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <DataGrid Grid.Row="1" 
-                          Name="PlanDataGrid" 
-                          AutoGenerateColumns="True" 
-                          IsReadOnly="True"
-                          GridLinesVisibility="All"
-                          BorderThickness="1" 
-                          BorderBrush="#cccccc"
-                          Background="White"/>
-            </Grid>
-        </TabItem>
+                    <TextBlock Text="Wygenerowany Plan Zajęć Uczelni" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               Margin="0,0,0,15"
+                               Foreground="#2b2b2b"/>
 
-        <TabItem Header="Wykres Zbieżności">
-            <Grid Margin="15">
-                <TextBlock Text="Tutaj zostanie wyrysowany wykres postępu algorytmu (ScottPlot)" 
-                           VerticalAlignment="Center" 
-                           HorizontalAlignment="Center" 
-                           FontSize="16"
-                           Foreground="Gray"/>
-            </Grid>
-        </TabItem>
-    </TabControl>
+                    <DataGrid Grid.Row="1" 
+                              Name="PlanDataGrid" 
+                              x:CompileBindings="False"
+                              AutoGenerateColumns="False" 
+                              IsReadOnly="True"
+                              GridLinesVisibility="All"
+                              BorderThickness="1" 
+                              BorderBrush="#cccccc"
+                              >
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Dzień" Binding="{Binding DayName}" Width="120" />
+                            <DataGridTextColumn Header="Godziny" Binding="{Binding TimeRange}" Width="120" />
+                            <DataGridTextColumn Header="Przedmiot" Binding="{Binding CourseName}" Width="*" />
+                            <DataGridTextColumn Header="Grupa" Binding="{Binding GroupName}" Width="100" />
+                            <DataGridTextColumn Header="Prowadzący" Binding="{Binding InstructorName}" Width="250" />
+                            <DataGridTextColumn Header="Sala" Binding="{Binding RoomName}" Width="200" />
+                        </DataGrid.Columns>
+</DataGrid> 
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Wykres Zbieżności">
+                <Grid Margin="15">
+                    <TextBlock Text="Tutaj zostanie wyrysowany wykres postępu algorytmu (ScottPlot)" 
+                               VerticalAlignment="Center" 
+                               HorizontalAlignment="Center" 
+                               FontSize="16"
+                               Foreground="Gray"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Margin="15" BorderBrush="#333333" BorderThickness="2" Background="#1e1e1e">
+            <ScrollViewer>
+                <TextBlock Name="LogConsole" 
+                           Text="System gotowy do pracy. Oczekuję na wczytanie danych..." 
+                           Margin="10" 
+                           TextWrapping="Wrap" 
+                           FontFamily="Consolas" 
+                           Foreground="#4CAF50" /> </ScrollViewer>
+        </Border>
+
+    </Grid>
 </Window>
