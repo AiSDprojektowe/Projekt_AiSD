@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Projekt_AiSD.Models;
 using Projekt_AiSD.Modules;
+using Avalonia.Media.Imaging;
 
 namespace Projekt_AiSD.GUI
 {
@@ -174,6 +175,30 @@ namespace Projekt_AiSD.GUI
                     else
                     {
                         Log("BŁĄD UI: Nie znaleziono kontrolki PlanDataGrid!");
+                    }
+
+                    try
+                    {
+                        string plotPath = "wykres_zbieznosci.png";
+
+                        // Sprawdzamy, czy silnik na pewno wygenerował plik
+                        if (System.IO.File.Exists(plotPath))
+                        {
+                            if (ConvergencePlotImage != null)
+                            {
+                                // Avalonia wymaga specjalnego obiektu Bitmap do wyświetlania obrazków z dysku
+                                ConvergencePlotImage.Source = new Bitmap(plotPath);
+                                Log("Wykres zbieżności został załadowany do interfejsu.");
+                            }
+                        }
+                        else
+                        {
+                            Log("BŁĄD: Nie znaleziono pliku wykresu na dysku.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"BŁĄD GUI przy ładowaniu wykresu: {ex.Message}");
                     }
                 });
 

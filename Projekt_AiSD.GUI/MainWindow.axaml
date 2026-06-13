@@ -48,13 +48,7 @@
             </TabItem>
 
             <TabItem Header="Wykres Zbieżności">
-                <Grid Margin="15">
-                    <TextBlock Text="Tutaj zostanie wyrysowany wykres postępu algorytmu (ScottPlot)" 
-                               VerticalAlignment="Center" 
-                               HorizontalAlignment="Center" 
-                               FontSize="16"
-                               Foreground="Gray"/>
-                </Grid>
+                         <Image x:Name="ConvergencePlotImage" Stretch="Uniform" Margin="10"/>
             </TabItem>
         </TabControl>
 
