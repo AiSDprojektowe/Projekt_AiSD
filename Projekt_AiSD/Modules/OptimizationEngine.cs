@@ -1,7 +1,9 @@
 ﻿using Projekt_AiSD.Models;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
+using ScottPlot;
 
 namespace Projekt_AiSD.Modules
 {
@@ -240,6 +242,9 @@ namespace Projekt_AiSD.Modules
 
             Random rnd = new Random();
             int maxIterations = 50000;
+            //  listy do zapisu historii iteracji i wyników, można później wykorzystać do analizy lub wizualizacji
+            List<double> iterationHistory = new List<double>();
+            List<double> scoreHistory = new List<double>();
 
             for (int i = 0; i < maxIterations; i++)
             {
@@ -282,6 +287,40 @@ namespace Projekt_AiSD.Modules
                     lesson.StartHour = oldStartHour;
                     lesson.EndHour = oldEndHour;
                 }
+                if (i % 100 == 0)
+                {
+                    iterationHistory.Add(i);
+                    scoreHistory.Add(bestScore);
+                }
+            }
+            try
+            {
+                // Dodajemy ostatni punkt
+                iterationHistory.Add(maxIterations);
+                scoreHistory.Add(bestScore);
+
+                // Tworzymy nowy wykres (składnia dla ScottPlot 5)
+                Plot myPlot = new Plot();
+
+                // Dodajemy naszą krzywą spadku kary
+                var scatter = myPlot.Add.Scatter(iterationHistory.ToArray(), scoreHistory.ToArray());
+                scatter.LineWidth = 2;
+                scatter.Color = Colors.Blue;
+
+                // Upiększamy wykres
+                myPlot.Title("Wykres zbieżności algorytmu optymalizacyjnego");
+                myPlot.XLabel("Liczba iteracji");
+                myPlot.YLabel("Wartość funkcji kary (Penalty)");
+
+                // Zapisujemy do pliku PNG w folderze z aplikacją
+                string plotPath = "wykres_zbieznosci.png";
+                myPlot.SavePng(plotPath, 800, 600);
+
+                Console.WriteLine($"[WYKRES] Zapisano plik wykresu pod ścieżką: {plotPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WYKRES BŁĄD] Nie udało się wygenerować wykresu: {ex.Message}");
             }
 
             Console.WriteLine($"[Optymalizacja SC] Kara początkowa: {CalculatePenalty(initialPlan, instructorPrefs, instructorIds, uniqueCourseIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay)} | Kara końcowa: {bestScore}");
