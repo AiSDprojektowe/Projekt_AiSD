@@ -18,7 +18,7 @@ namespace Projekt_AiSD.GUI
 {
     public partial class MainWindow : Window
     {
-        private UniversityData _universityData;
+        private UniversityData? _universityData;
         private List<DisplayLesson> _displayPlan = new List<DisplayLesson>();
         private List<DisplayLesson> _filteredPlan = new List<DisplayLesson>();
         private IReadOnlyList<int> _hardHistory = Array.Empty<int>();
@@ -32,21 +32,18 @@ namespace Projekt_AiSD.GUI
 
         private void Log(string message)
         {
-            var logConsole = this.FindControl<TextBlock>("LogConsole");
-            if (logConsole != null)
+            if (LogConsole != null)
             {
-                logConsole.Text += $"\n[{DateTime.Now:HH:mm:ss}] {message}";
+                LogConsole.Text += $"\n[{DateTime.Now:HH:mm:ss}] {message}";
             }
         }
 
         private async void LoadDataBtn_Click(object sender, RoutedEventArgs e)
         {
-            var loadBtn = this.FindControl<Button>("LoadDataBtn");
-            if (loadBtn != null) loadBtn.IsEnabled = false;
+            if (LoadDataBtn != null) LoadDataBtn.IsEnabled = false;
 
             try
             {
-                // 1. Otwieramy okno wyboru pliku (Eksplorator)
                 var topLevel = TopLevel.GetTopLevel(this);
                 if (topLevel == null) throw new Exception("Nie można uzyskać dostępu do okna aplikacji.");
 
@@ -66,7 +63,6 @@ namespace Projekt_AiSD.GUI
                     return;
                 }
 
-                // 2. Pobieramy pełną ścieżkę do wybranego pliku
                 var selectedFile = files[0];
                 string filePath = selectedFile.TryGetLocalPath();
 
@@ -78,25 +74,20 @@ namespace Projekt_AiSD.GUI
                 Log($"Wybrano plik: {filePath}");
                 Log("Rozpoczynam wczytywanie danych i analizę LLM (lub ładuję z Cache)...");
 
-                // 3. Odpalamy fabrykę danych
                 DataPipeline pipeline = new DataPipeline();
                 _universityData = await pipeline.PrepareDataAsync(filePath);
 
                 Log("Sukces! Dane z JSON i LLM załadowane pomyślnie.");
 
-                // 4. Wrzucamy prowadzących do tabeli na start
-                var tabela = this.FindControl<DataGrid>("PlanDataGrid");
-                if (tabela != null && _universityData.Instructors != null)
+                if (PlanDataGrid != null && _universityData?.Instructors != null)
                 {
-                    tabela.ItemsSource = _universityData.Instructors;
+                    PlanDataGrid.ItemsSource = _universityData.Instructors;
                     Log("Tabela DataGrid została uzupełniona prowadzącymi.");
                 }
 
                 InitializeFilters();
 
-                // 5. Odblokowujemy przycisk optymalizacji
-                var optBtn = this.FindControl<Button>("RunOptimizationBtn");
-                if (optBtn != null) optBtn.IsEnabled = true;
+                if (RunOptimizationBtn != null) RunOptimizationBtn.IsEnabled = true;
             }
             catch (Exception ex)
             {
@@ -104,7 +95,7 @@ namespace Projekt_AiSD.GUI
             }
             finally
             {
-                if (loadBtn != null) loadBtn.IsEnabled = true;
+                if (LoadDataBtn != null) LoadDataBtn.IsEnabled = true;
             }
         }
 
@@ -112,8 +103,7 @@ namespace Projekt_AiSD.GUI
         {
             Log("Uruchamianie silnika optymalizacji...");
 
-            var optBtn = this.FindControl<Button>("RunOptimizationBtn");
-            if (optBtn != null) optBtn.IsEnabled = false;
+            if (RunOptimizationBtn != null) RunOptimizationBtn.IsEnabled = false;
 
             try
             {
@@ -139,16 +129,14 @@ namespace Projekt_AiSD.GUI
 
                 Log($"Optymalizacja zakończona! Wygenerowano {finalPlan.Count} kafelków zajęć.");
 
-                var convergenceCanvas = this.FindControl<Canvas>("ConvergenceCanvas");
-                if (convergenceCanvas != null)
+                if (ConvergenceCanvas != null)
                 {
-                    DrawConvergencePlot(convergenceCanvas, _softHistory);
+                    DrawConvergencePlot(ConvergenceCanvas, _softHistory);
                     Log($"Wykres zbieżności odświeżony ({_softHistory.Count} punktów).");
                     ExportConvergenceChartToHtml(_softHistory);
                     Log("Wykres zapisany do HTML i otwarty w przeglądarce.");
                 }
 
-                // Tłumaczenie ID na nazwy wyświetlane
                 var displayPlan = finalPlan.Select(lesson => {
                     var course = _universityData.Courses.FirstOrDefault(c => c.Id == lesson.CourseId);
                     var inst = _universityData.Instructors.FirstOrDefault(i => i.Id == lesson.InstructorId);
@@ -161,18 +149,18 @@ namespace Projekt_AiSD.GUI
                         "Wed" => "3. Środa",
                         "Thu" => "4. Czwartek",
                         "Fri" => "5. Piątek",
-                        _ => lesson.Day
+                        _ => lesson.Day ?? ""
                     };
 
                     return new DisplayLesson
                     {
                         DayName = polishDay,
                         TimeRange = $"{lesson.StartHour}:00 - {lesson.EndHour}:00",
-                        CourseName = course != null ? course.Name : lesson.CourseId,
+                        CourseName = course != null ? course.Name : lesson.CourseId ?? "",
                         CourseType = course != null ? PolishCourseType(course.Type) : "-",
                         GroupName = course != null ? course.GroupId : "-",
-                        InstructorName = inst != null ? inst.Name : lesson.InstructorId,
-                        RoomName = room != null ? $"{room.Name} ({room.Id})" : lesson.RoomId
+                        InstructorName = inst != null ? inst.Name : lesson.InstructorId ?? "",
+                        RoomName = room != null ? $"{room.Name} ({room.Id})" : lesson.RoomId ?? ""
                     };
                 })
                 .OrderBy(l => l.DayName)
@@ -201,7 +189,7 @@ namespace Projekt_AiSD.GUI
             }
             finally
             {
-                if (optBtn != null) optBtn.IsEnabled = true;
+                if (RunOptimizationBtn != null) RunOptimizationBtn.IsEnabled = true;
             }
         }
 
@@ -209,32 +197,28 @@ namespace Projekt_AiSD.GUI
         {
             if (_universityData == null) return;
 
-            var instructorCombo = this.FindControl<ComboBox>("FilterInstructorCombo");
-            var roomCombo = this.FindControl<ComboBox>("FilterRoomCombo");
-            var groupCombo = this.FindControl<ComboBox>("FilterGroupCombo");
-
-            if (instructorCombo != null)
+            if (FilterInstructorCombo != null)
             {
-                instructorCombo.ItemsSource = new[] { "Wszyscy" }.Concat(_universityData.Instructors?.Select(i => i.Name) ?? Enumerable.Empty<string>()).ToList();
-                instructorCombo.SelectedIndex = 0;
-                instructorCombo.SelectionChanged -= FiltersChanged;
-                instructorCombo.SelectionChanged += FiltersChanged;
+                FilterInstructorCombo.ItemsSource = new[] { "Wszyscy" }.Concat(_universityData.Instructors?.Select(i => i.Name).Where(n => n != null) ?? Enumerable.Empty<string>()).ToList();
+                FilterInstructorCombo.SelectedIndex = 0;
+                FilterInstructorCombo.SelectionChanged -= FiltersChanged;
+                FilterInstructorCombo.SelectionChanged += FiltersChanged;
             }
 
-            if (roomCombo != null)
+            if (FilterRoomCombo != null)
             {
-                roomCombo.ItemsSource = new[] { "Wszystkie" }.Concat(_universityData.Rooms?.Select(r => r.Name) ?? Enumerable.Empty<string>()).ToList();
-                roomCombo.SelectedIndex = 0;
-                roomCombo.SelectionChanged -= FiltersChanged;
-                roomCombo.SelectionChanged += FiltersChanged;
+                FilterRoomCombo.ItemsSource = new[] { "Wszystkie" }.Concat(_universityData.Rooms?.Select(r => r.Name).Where(n => n != null) ?? Enumerable.Empty<string>()).ToList();
+                FilterRoomCombo.SelectedIndex = 0;
+                FilterRoomCombo.SelectionChanged -= FiltersChanged;
+                FilterRoomCombo.SelectionChanged += FiltersChanged;
             }
 
-            if (groupCombo != null)
+            if (FilterGroupCombo != null)
             {
-                groupCombo.ItemsSource = new[] { "Wszystkie" }.Concat(_universityData.Courses?.Select(c => c.GroupId).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct() ?? Enumerable.Empty<string>()).ToList();
-                groupCombo.SelectedIndex = 0;
-                groupCombo.SelectionChanged -= FiltersChanged;
-                groupCombo.SelectionChanged += FiltersChanged;
+                FilterGroupCombo.ItemsSource = new[] { "Wszystkie" }.Concat(_universityData.Courses?.Select(c => c.GroupId).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct() ?? Enumerable.Empty<string>()).ToList();
+                FilterGroupCombo.SelectedIndex = 0;
+                FilterGroupCombo.SelectionChanged -= FiltersChanged;
+                FilterGroupCombo.SelectionChanged += FiltersChanged;
             }
 
             ApplyFilters();
@@ -243,23 +227,19 @@ namespace Projekt_AiSD.GUI
         private void FiltersChanged(object? sender, SelectionChangedEventArgs e)
         {
             ApplyFilters();
-            var tabela = this.FindControl<DataGrid>("PlanDataGrid");
-            if (tabela != null)
+            if (PlanDataGrid != null)
             {
-                tabela.ItemsSource = _filteredPlan;
+                PlanDataGrid.ItemsSource = _filteredPlan;
             }
         }
 
         private void ApplyFilters()
         {
             IEnumerable<DisplayLesson> query = _displayPlan;
-            var instructorCombo = this.FindControl<ComboBox>("FilterInstructorCombo");
-            var roomCombo = this.FindControl<ComboBox>("FilterRoomCombo");
-            var groupCombo = this.FindControl<ComboBox>("FilterGroupCombo");
 
-            string instructor = instructorCombo?.SelectedItem as string;
-            string room = roomCombo?.SelectedItem as string;
-            string group = groupCombo?.SelectedItem as string;
+            string? instructor = FilterInstructorCombo?.SelectedItem as string;
+            string? room = FilterRoomCombo?.SelectedItem as string;
+            string? group = FilterGroupCombo?.SelectedItem as string;
 
             if (!string.IsNullOrWhiteSpace(instructor) && instructor != "Wszyscy")
             {
@@ -268,7 +248,7 @@ namespace Projekt_AiSD.GUI
 
             if (!string.IsNullOrWhiteSpace(room) && room != "Wszystkie")
             {
-                query = query.Where(x => x.RoomName.StartsWith(room));
+                query = query.Where(x => x.RoomName != null && x.RoomName.StartsWith(room));
             }
 
             if (!string.IsNullOrWhiteSpace(group) && group != "Wszystkie")
@@ -581,7 +561,7 @@ namespace Projekt_AiSD.GUI
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
             ctx.font = 'bold 18px Arial';
-            ctx.fillText('Zbieżność funkcji celu', padding.left, 22);
+            ctx.fillText('Zbieżność fungsi celu', padding.left, 22);
 
             ctx.font = '12px Arial';
             ctx.fillStyle = '#6b7280';
@@ -627,12 +607,12 @@ namespace Projekt_AiSD.GUI
 
     public class DisplayLesson
     {
-        public string DayName { get; set; }
-        public string TimeRange { get; set; }
-        public string CourseName { get; set; }
-        public string CourseType { get; set; }
-        public string GroupName { get; set; }
-        public string InstructorName { get; set; }
-        public string RoomName { get; set; }
+        public string? DayName { get; set; }
+        public string? TimeRange { get; set; }
+        public string? CourseName { get; set; }
+        public string? CourseType { get; set; }
+        public string? GroupName { get; set; }
+        public string? InstructorName { get; set; }
+        public string? RoomName { get; set; }
     }
 }
