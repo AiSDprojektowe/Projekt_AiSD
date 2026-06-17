@@ -300,7 +300,7 @@ namespace Projekt_AiSD.Modules
             int bestScore = CalculatePenalty(bestPlan, instructorPrefs, instructorIds, uniqueCourseIds, uniqueGroupIds, instructorTotalHours, instructorSchedule, courseDays, courseLessonCount, groupSchedule, lessonsPerDay);
 
             Random rnd = new Random();
-            int maxIterations = 50000;
+            int maxIterations = 150000;
 
             List<double> iterationHistory = new List<double>();
             List<double> scoreHistory = new List<double>();
