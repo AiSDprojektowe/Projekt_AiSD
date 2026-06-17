@@ -1,6 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.Linq; // WAŻNE: To ta biblioteka pozwala na dzielenie na paczki (.Chunk)
+using System.Linq; 
 using System.Text.Json;
 using System.Threading.Tasks;
 using Projekt_AiSD.Models;
@@ -9,12 +9,12 @@ namespace Projekt_AiSD.Modules
 {
     public class DataPipeline
     {
-        // Nazwa pliku do przechowywania zamrożonych danych
+       
         private const string CacheFileName = "cached_data.json";
 
         public async Task<UniversityData> PrepareDataAsync(string jsonFilePath)
         {
-            // 1. MECHANIZM CACHE
+            
             if (File.Exists(CacheFileName))
             {
                 Console.WriteLine("[CACHE] Znaleziono gotowe dane! Pomijam odpytywanie modelu Bielik...");
@@ -27,7 +27,7 @@ namespace Projekt_AiSD.Modules
                 return cachedData;
             }
 
-            // 2. WCZYTYWANIE DANYCH JSON
+           
             Console.WriteLine("[API] Brak cache. Wczytywanie surowych danych z pliku JSON...");
             string rawJson = await File.ReadAllTextAsync(jsonFilePath);
             var universityData = JsonSerializer.Deserialize<UniversityData>(rawJson, new JsonSerializerOptions
@@ -40,11 +40,10 @@ namespace Projekt_AiSD.Modules
                 throw new Exception("Błąd wczytywania danych. Plik wejściowy jest pusty.");
             }
 
-            // 3. TRYB PACZKOWY (BATCHING)
+            
             Console.WriteLine("[API] Uruchamianie modułu LLM Bielik w trybie PACZKOWYM (Batching)...");
             LlmService llm = new LlmService();
 
-            // Filtrujemy i dzielimy na paczki po 5 osób
             var instructorsWithPrefs = universityData.Instructors
                 .Where(i => !string.IsNullOrWhiteSpace(i.PreferencesText))
                 .ToArray();
@@ -57,7 +56,6 @@ namespace Projekt_AiSD.Modules
             {
                 Console.WriteLine($"-> Wysyłam paczkę {currentChunk} z {totalChunks} (Prowadzący: {string.Join(", ", batch.Select(b => b.Id))})...");
 
-                // TUTAJ ZMIANA: Używamy nowej metody Batch
                 var batchResults = await llm.ParsePreferencesBatch(batch);
 
                 if (batchResults != null)
@@ -76,10 +74,9 @@ namespace Projekt_AiSD.Modules
                 }
 
                 currentChunk++;
-                await Task.Delay(1000); // Oddech dla serwera
+                await Task.Delay(1000);
             }
 
-            // 4. ZAPIS DO CACHE
             Console.WriteLine("[CACHE] Zapisywanie przetworzonych danych na dysk...");
             string jsonToSave = JsonSerializer.Serialize(universityData, new JsonSerializerOptions
             {

@@ -1,11 +1,12 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage; // WAŻNE: Dodana biblioteka do obsługi Eksploratora plików
+using Avalonia.Platform.Storage; 
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Projekt_AiSD.Models;
 using Projekt_AiSD.Modules;
+using Avalonia.Media.Imaging;
 
 namespace Projekt_AiSD.GUI
 {
@@ -34,28 +35,25 @@ namespace Projekt_AiSD.GUI
 
             try
             {
-                // 1. Otwieramy okno wyboru pliku (Eksplorator)
                 var topLevel = TopLevel.GetTopLevel(this);
                 if (topLevel == null) throw new Exception("Nie można uzyskać dostępu do okna aplikacji.");
 
                 var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
                     Title = "Wybierz plik z danymi uczelni",
-                    AllowMultiple = false, // Wybieramy tylko jeden plik
+                    AllowMultiple = false,
                     FileTypeFilter = new[]
                     {
                         new FilePickerFileType("Pliki JSON") { Patterns = new[] { "*.json" } }
                     }
                 });
 
-                // Jeśli użytkownik kliknął "Anuluj" i zamknął okno
                 if (files == null || !files.Any())
                 {
                     Log("Anulowano wybór pliku.");
                     return;
                 }
 
-                // 2. Pobieramy pełną ścieżkę do wybranego pliku
                 var selectedFile = files[0];
                 string filePath = selectedFile.TryGetLocalPath();
 
@@ -67,13 +65,11 @@ namespace Projekt_AiSD.GUI
                 Log($"Wybrano plik: {filePath}");
                 Log("Rozpoczynam wczytywanie danych i analizę LLM (lub ładuję z Cache)...");
 
-                // 3. Odpalamy naszą fabrykę podając dynamiczną ścieżkę, którą wskazał użytkownik!
                 DataPipeline pipeline = new DataPipeline();
                 _universityData = await pipeline.PrepareDataAsync(filePath);
 
                 Log("Sukces! Dane z JSON i LLM załadowane pomyślnie.");
 
-                // 4. Wrzucamy prowadzących do tabeli
                 var tabela = this.FindControl<DataGrid>("PlanDataGrid");
                 if (tabela != null && _universityData.Instructors != null)
                 {
@@ -81,7 +77,6 @@ namespace Projekt_AiSD.GUI
                     Log("Tabela DataGrid została uzupełniona prowadzącymi.");
                 }
 
-                // 5. Odblokowujemy przycisk optymalizacji
                 var optBtn = this.FindControl<Button>("RunOptimizationBtn");
                 if (optBtn != null) optBtn.IsEnabled = true;
             }
@@ -104,40 +99,49 @@ namespace Projekt_AiSD.GUI
 
             try
             {
-                // Weryfikacja, czy dane na pewno zostały wczytane
+                
                 if (_universityData == null || _universityData.Instructors == null ||
                     _universityData.Rooms == null || _universityData.Courses == null)
                 {
                     throw new Exception("Brak pełnych danych! Najpierw wczytaj i przetwórz plik JSON.");
                 }
 
-                // Tworzymy instancję Twojego silnika z Modułu 2
+                
                 OptimizationEngine engine = new OptimizationEngine();
 
                 Log("Krok 1/2: Generowanie planu bazowego (Ograniczenia Twarde)...");
 
-                // Wyrzucamy ciężkie obliczenia do osobnego wątku w tle (Task.Run)
+                
                 var finalPlan = await Task.Run(() =>
                 {
-                    // 1. Uruchamiamy algorytm naiwny (HC)
+                   
                     var basePlan = engine.RunOptimization(_universityData.Instructors, _universityData.Rooms, _universityData.Courses);
 
-                    // 2. Wrzucamy wynik do algorytmu optymalizującego (SC)
+                    
                     return engine.OptimizeSoftConstraints(basePlan, _universityData.Instructors, _universityData.Rooms);
                 });
 
                 Log($"Optymalizacja zakończona! Wygenerowano {finalPlan.Count} kafelków zajęć.");
 
-                // Sukces! Podmieniamy dane w tabeli. 
-                // Zamiast listy prowadzących, DataGrid pokaże teraz gotowy plan zajęć.
-                // --- PROCES TŁUMACZENIA ID NA NAZWY ---
+                try
+                {
+                    Visualization.GenerateHtmlReport(finalPlan, _universityData.Instructors, _universityData.Rooms, _universityData.Courses);
+                    Log("Zapisano elegancki raport HTML na dysku!");
+                }
+                catch (Exception ex)
+                {
+                    Log($"BŁĄD przy generowaniu HTML: {ex.Message}");
+                }
+  
+
+               
                 var displayPlan = finalPlan.Select(lesson => {
-                    // Wyszukujemy pełne obiekty na podstawie ID
+                    
                     var course = _universityData.Courses.FirstOrDefault(c => c.Id == lesson.CourseId);
                     var inst = _universityData.Instructors.FirstOrDefault(i => i.Id == lesson.InstructorId);
                     var room = _universityData.Rooms.FirstOrDefault(r => r.Id == lesson.RoomId);
 
-                    // Tłumaczymy angielskie skróty i wymuszamy sortowanie dodając cyfry
+                    
                     string polishDay = lesson.Day switch
                     {
                         "Mon" => "1. Poniedziałek",
@@ -159,13 +163,13 @@ namespace Projekt_AiSD.GUI
                     };
 
                 })
-                .OrderBy(l => l.DayName)       // Sortujemy najpierw po dniach
-                .ThenBy(l => l.TimeRange)      // Potem po godzinach
+                .OrderBy(l => l.DayName)       
+                .ThenBy(l => l.TimeRange)      
                 .ToList();
 
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    // W nowoczesnej Avalonii odwołujemy się do tabeli bezpośrednio po jej nazwie z XAML-a:
+                    
                     if (PlanDataGrid != null)
                     {
                         PlanDataGrid.ItemsSource = displayPlan;
@@ -175,14 +179,29 @@ namespace Projekt_AiSD.GUI
                     {
                         Log("BŁĄD UI: Nie znaleziono kontrolki PlanDataGrid!");
                     }
-                });
 
-                var tabela = this.FindControl<DataGrid>("PlanDataGrid");
-                if (tabela != null)
-                {
-                    // Wrzucamy nasze piękne, przetłumaczone i posortowane wiersze!
-                    tabela.ItemsSource = displayPlan;
-                }
+                    try
+                    {
+                        string plotPath = "wykres_zbieznosci.png";
+
+                        if (System.IO.File.Exists(plotPath))
+                        {
+                            if (ConvergencePlotImage != null)
+                            {
+                                ConvergencePlotImage.Source = new Bitmap(plotPath);
+                                Log("Wykres zbieżności został załadowany do interfejsu.");
+                            }
+                        }
+                        else
+                        {
+                            Log("BŁĄD: Nie znaleziono pliku wykresu na dysku.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"BŁĄD GUI przy ładowaniu wykresu: {ex.Message}");
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -194,7 +213,8 @@ namespace Projekt_AiSD.GUI
             }
         }
     }
-    // Klasa reprezentująca jeden, ładny wiersz w naszej tabeli
+
+
     public class DisplayLesson
     {
         public string DayName { get; set; }
