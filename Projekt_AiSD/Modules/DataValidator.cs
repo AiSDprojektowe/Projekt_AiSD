@@ -27,7 +27,6 @@ namespace Projekt_AiSD.Modules
 
                 bool isOk = true;
 
-                // Sprawdzanie Instruktorów
                 foreach (var inst in data.Instructors)
                 {
                     if (inst.PrefferedHoursPerWeek < 0)
@@ -37,7 +36,6 @@ namespace Projekt_AiSD.Modules
                     }
                 }
 
-                // Sprawdzanie Sal (Rooms)
                 foreach (var room in data.Rooms)
                 {
                     if (string.IsNullOrEmpty(room.Id))
